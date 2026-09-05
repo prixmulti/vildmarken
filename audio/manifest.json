@@ -1,0 +1,19 @@
+{
+  "files": [
+    { "label": "Arkæologisk fund (ingen lyd)", "value": "urne" },
+    { "label": "heden_speaks/120-aars-stilhed.mp3", "value": "https://naturaudio.dk/vildmarken/audio/heden_speaks/120-aars-stilhed.mp3" },
+    { "label": "heden_speaks/den-uroerte-hede.mp3", "value": "https://naturaudio.dk/vildmarken/audio/heden_speaks/den-uroerte-hede.mp3" },
+    { "label": "heden_speaks/myrernes-hede.mp3", "value": "https://naturaudio.dk/vildmarken/audio/heden_speaks/myrernes-hede.mp3" },
+    { "label": "heden_speaks/varde-aa-genslyngning.mp3", "value": "https://naturaudio.dk/vildmarken/audio/heden_speaks/varde-aa-genslyngning.mp3" },
+    { "label": "historie_speaks/ac-teilmann-oplysningstiden-paa-noerholm.mp3", "value": "https://naturaudio.dk/vildmarken/audio/historie_speaks/ac-teilmann-oplysningstiden-paa-noerholm.mp3" },
+    { "label": "historie_speaks/fredningen-hvordan-heden-blev-reddet.mp3", "value": "https://naturaudio.dk/vildmarken/audio/historie_speaks/fredningen-hvordan-heden-blev-reddet.mp3" },
+    { "label": "historie_speaks/gravhoejene-monumenter-fra-bronzealderen.mp3", "value": "https://naturaudio.dk/vildmarken/audio/historie_speaks/gravhoejene-monumenter-fra-bronzealderen.mp3" },
+    { "label": "historie_speaks/stavnsbaandets-skygge-over-heden.mp3", "value": "https://naturaudio.dk/vildmarken/audio/historie_speaks/stavnsbaandets-skygge-over-heden.mp3" },
+    { "label": "historie_speaks/toervegravernes-haarde-liv.mp3", "value": "https://naturaudio.dk/vildmarken/audio/historie_speaks/toervegravernes-haarde-liv.mp3" },
+    { "label": "rewilding_speaks/borgervidenskab-i-felten.mp3", "value": "https://naturaudio.dk/vildmarken/audio/rewilding_speaks/borgervidenskab-i-felten.mp3" },
+    { "label": "rewilding_speaks/en-national-vision.mp3", "value": "https://naturaudio.dk/vildmarken/audio/rewilding_speaks/en-national-vision.mp3" },
+    { "label": "rewilding_speaks/noerholms-forvandling.mp3", "value": "https://naturaudio.dk/vildmarken/audio/rewilding_speaks/noerholms-forvandling.mp3" },
+    { "label": "rewilding_speaks/oekosystemets-maskinrum.mp3", "value": "https://naturaudio.dk/vildmarken/audio/rewilding_speaks/oekosystemets-maskinrum.mp3" },
+    { "label": "rewilding_speaks/respekt-for-videnskaben.mp3", "value": "https://naturaudio.dk/vildmarken/audio/rewilding_speaks/respekt-for-videnskaben.mp3" }
+  ]
+}

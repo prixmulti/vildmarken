@@ -1,0 +1,8 @@
+<?php
+
+define('ADMIN_PASSWORD', 'dev123');
+define('DEBUG', true);
+
+// Datafordeler / Dataforsyningen API-nøgle til matrikelkort (WMS)
+// Opret på https://portal.datafordeler.dk
+define('DATAFORSYNINGEN_TOKEN', '');
