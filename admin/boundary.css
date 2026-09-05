@@ -81,8 +81,17 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-.map-container.map-click-import {
-  cursor: crosshair;
+.map-container.map-parcel-select {
+  cursor: pointer;
+}
+
+.map-container.map-parcel-select .leaflet-interactive {
+  cursor: pointer;
+}
+
+.parcel-import-actions {
+  margin-top: -0.25rem;
+  margin-bottom: 0.25rem;
 }
 
 .leaflet-pm-toolbar {

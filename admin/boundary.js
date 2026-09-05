@@ -4,6 +4,12 @@ const START_ZOOM = 13;
 const MAX_UNDO = 30;
 
 const MIN_ZOOM_FOR_MATRIKEL = 14;
+const SNAP_OPTIONS = {
+  snappable: true,
+  snapDistance: 20,
+  snapSegment: true,
+  snapMiddle: true,
+};
 const MATRIKEL_STYLE = {
   color: '#92400e',
   weight: 1.5,
@@ -12,6 +18,38 @@ const MATRIKEL_STYLE = {
   fillOpacity: 0.06,
   interactive: false,
 };
+
+function getParcelStyle(layer) {
+  const isSelected = state.selectedParcelLayers.has(layer);
+  const isHovered = state.hoveredParcelLayer === layer && state.parcelSelectMode;
+
+  if (isSelected) {
+    return {
+      color: '#b45309',
+      weight: 2.5,
+      opacity: 1,
+      fillColor: '#f59e0b',
+      fillOpacity: 0.28,
+      interactive: state.parcelSelectMode,
+    };
+  }
+
+  if (isHovered) {
+    return {
+      color: '#c2410c',
+      weight: 2,
+      opacity: 1,
+      fillColor: '#fb923c',
+      fillOpacity: 0.2,
+      interactive: state.parcelSelectMode,
+    };
+  }
+
+  return {
+    ...MATRIKEL_STYLE,
+    interactive: state.parcelSelectMode,
+  };
+}
 
 const CATEGORY_COLORS = {
   Historie: '#78350f',
@@ -26,6 +64,9 @@ const state = {
   matrikelEnabled: false,
   matrikelFetchTimer: null,
   matrikelRequestId: 0,
+  selectedParcelLayers: new Set(),
+  hoveredParcelLayer: null,
+  parcelSelectMode: false,
   editGroup: null,
   maskLayer: null,
   pointMarkers: [],
@@ -34,7 +75,6 @@ const state = {
   selectedIndex: null,
   undoStack: [],
   isSyncing: false,
-  clickImportMode: false,
   statusTimer: null,
 };
 
@@ -46,7 +86,10 @@ const els = {
   statusBadge: document.getElementById('status-badge'),
   loadError: document.getElementById('load-error'),
   toggleMatrikel: document.getElementById('toggle-matrikel'),
-  toggleClickImport: document.getElementById('toggle-click-import'),
+  toggleParcelSelect: document.getElementById('toggle-parcel-select'),
+  parcelSelectionInfo: document.getElementById('parcel-selection-info'),
+  importParcels: document.getElementById('btn-import-parcels'),
+  clearParcelSelection: document.getElementById('btn-clear-parcel-selection'),
   toggleMask: document.getElementById('toggle-mask'),
   togglePoints: document.getElementById('toggle-points'),
   matrikelHint: document.getElementById('matrikel-hint'),
@@ -167,6 +210,10 @@ function bindLayerEvents(layer) {
       refreshLayerStyles();
     });
   });
+
+  layer.on('pm:enable', () => {
+    attachMatrikelSnapTargets(layer.pm);
+  });
 }
 
 function getLayerIndex(layer) {
@@ -209,9 +256,11 @@ function rebuildEditableLayers() {
   if (state.editGroup.pm) {
     state.editGroup.pm.enable({
       allowSelfIntersection: false,
-      snappable: true,
+      ...SNAP_OPTIONS,
     });
   }
+
+  attachMatrikelSnapTargetsToEditLayers();
 
   renderMask();
   renderSegmentList();
@@ -366,10 +415,168 @@ function ensureMatrikelGroup() {
 
   state.matrikelGroup = L.geoJSON(null, {
     pane: 'matrikelPane',
-    style: MATRIKEL_STYLE,
+    style: () => ({
+      ...MATRIKEL_STYLE,
+      interactive: state.parcelSelectMode,
+    }),
+    onEachFeature: bindMatrikelFeature,
   });
 
   return state.matrikelGroup;
+}
+
+function bindMatrikelFeature(feature, layer) {
+  layer._jordstykkeFeature = feature;
+  layer.options.pmIgnore = true;
+  layer.options.snapIgnore = false;
+
+  layer.on('click', (event) => {
+    if (!state.parcelSelectMode) {
+      return;
+    }
+    L.DomEvent.stopPropagation(event);
+    toggleParcelSelection(layer);
+  });
+
+  layer.on('mouseover', () => {
+    if (!state.parcelSelectMode) {
+      return;
+    }
+    state.hoveredParcelLayer = layer;
+    updateParcelLayerStyle(layer);
+  });
+
+  layer.on('mouseout', () => {
+    if (state.hoveredParcelLayer === layer) {
+      state.hoveredParcelLayer = null;
+    }
+    updateParcelLayerStyle(layer);
+  });
+
+  updateParcelLayerStyle(layer);
+}
+
+function attachMatrikelSnapTargets(pmInstance) {
+  if (!pmInstance || !state.matrikelGroup || !state.matrikelEnabled) {
+    return;
+  }
+
+  pmInstance._otherSnapLayers = pmInstance._otherSnapLayers || [];
+  state.matrikelGroup.eachLayer((layer) => {
+    layer.options.snapIgnore = false;
+    if (!pmInstance._otherSnapLayers.includes(layer)) {
+      pmInstance._otherSnapLayers.push(layer);
+    }
+  });
+
+  if (typeof pmInstance._createSnapList === 'function') {
+    pmInstance._createSnapList();
+  }
+}
+
+function attachMatrikelSnapTargetsToEditLayers() {
+  if (!state.editGroup) {
+    return;
+  }
+  state.editGroup.eachLayer((layer) => {
+    if (layer.pm) {
+      attachMatrikelSnapTargets(layer.pm);
+    }
+  });
+}
+
+function updateParcelLayerStyle(layer) {
+  if (!layer?.setStyle) {
+    return;
+  }
+  layer.setStyle(getParcelStyle(layer));
+}
+
+function refreshAllParcelStyles() {
+  if (!state.matrikelGroup) {
+    return;
+  }
+  state.matrikelGroup.eachLayer(updateParcelLayerStyle);
+}
+
+function updateParcelSelectionUI() {
+  const count = state.selectedParcelLayers.size;
+  if (els.parcelSelectionInfo) {
+    els.parcelSelectionInfo.textContent = `${count} jordstykke${count === 1 ? '' : 'r'} valgt`;
+  }
+  if (els.importParcels) {
+    els.importParcels.disabled = count === 0;
+  }
+  if (els.clearParcelSelection) {
+    els.clearParcelSelection.disabled = count === 0;
+  }
+}
+
+function toggleParcelSelection(layer) {
+  if (state.selectedParcelLayers.has(layer)) {
+    state.selectedParcelLayers.delete(layer);
+  } else {
+    state.selectedParcelLayers.add(layer);
+  }
+  updateParcelLayerStyle(layer);
+  updateParcelSelectionUI();
+}
+
+function clearParcelSelection() {
+  state.selectedParcelLayers.clear();
+  state.hoveredParcelLayer = null;
+  refreshAllParcelStyles();
+  updateParcelSelectionUI();
+}
+
+function importSelectedParcels() {
+  if (state.selectedParcelLayers.size === 0) {
+    return;
+  }
+
+  const newSegments = [];
+  state.selectedParcelLayers.forEach((layer) => {
+    const geometry = layer._jordstykkeFeature?.geometry;
+    if (geometry) {
+      newSegments.push(...geoJsonToSegments(geometry));
+    }
+  });
+
+  if (newSegments.length === 0) {
+    showStatus('Ingen brugbar geometri i valgte jordstykker.', 'error');
+    return;
+  }
+
+  pushUndoSnapshot();
+  newSegments.forEach((segment) => {
+    state.forestBoundary.push(segment);
+  });
+  clearParcelSelection();
+  rebuildEditableLayers();
+  selectSegment(state.forestBoundary.length - newSegments.length, true);
+  showStatus(`${newSegments.length} segment${newSegments.length === 1 ? '' : 'er'} importeret.`);
+}
+
+function setParcelSelectMode(enabled) {
+  if (enabled && !state.matrikelEnabled) {
+    if (els.toggleParcelSelect) {
+      els.toggleParcelSelect.checked = false;
+    }
+    showStatus('Slå matrikelkort til først.', 'error');
+    return;
+  }
+
+  state.parcelSelectMode = enabled;
+  if (els.map) {
+    els.map.classList.toggle('map-parcel-select', enabled);
+  }
+
+  if (!enabled) {
+    clearParcelSelection();
+  } else {
+    refreshAllParcelStyles();
+    showStatus('Klik på jordstykker for at vælge dem.');
+  }
 }
 
 async function refreshMatrikelLayer() {
@@ -382,6 +589,7 @@ async function refreshMatrikelLayer() {
     if (state.matrikelGroup) {
       state.matrikelGroup.clearLayers();
     }
+    clearParcelSelection();
     els.matrikelHint.textContent = `Zoom ind til niveau ${MIN_ZOOM_FOR_MATRIKEL}+ for at se jordstykker.`;
     els.matrikelHint.classList.remove('hidden');
     return;
@@ -406,6 +614,7 @@ async function refreshMatrikelLayer() {
     }
 
     const group = ensureMatrikelGroup();
+    clearParcelSelection();
     group.clearLayers();
     group.addData(geoJson);
 
@@ -414,6 +623,7 @@ async function refreshMatrikelLayer() {
     }
 
     group.bringToBack();
+    attachMatrikelSnapTargetsToEditLayers();
   } catch (error) {
     if (requestId === state.matrikelRequestId) {
       showStatus(error.message, 'error');
@@ -438,19 +648,16 @@ function toggleMatrikel(checked) {
   } else {
     clearTimeout(state.matrikelFetchTimer);
     state.matrikelRequestId += 1;
+    if (state.parcelSelectMode && els.toggleParcelSelect) {
+      els.toggleParcelSelect.checked = false;
+      setParcelSelectMode(false);
+    }
+    clearParcelSelection();
     if (state.matrikelGroup) {
       state.matrikelGroup.clearLayers();
       state.matrikelGroup.remove();
     }
     els.matrikelHint.classList.add('hidden');
-  }
-}
-
-function setClickImportMode(enabled) {
-  state.clickImportMode = enabled;
-  els.map.classList.toggle('map-click-import', enabled);
-  if (enabled) {
-    showStatus('Klik på et jordstykke for at importere.');
   }
 }
 
@@ -475,52 +682,6 @@ function geoJsonToSegments(geometry) {
   }
 
   return segments;
-}
-
-async function importJordstykke(lat, lng) {
-  try {
-    showStatus('Henter jordstykke…');
-    const lookupUrl = `https://api.dataforsyningen.dk/jordstykker?x=${lng}&y=${lat}`;
-    const lookupResponse = await fetch(lookupUrl);
-    if (!lookupResponse.ok) {
-      throw new Error('Kunne ikke slå jordstykke op.');
-    }
-
-    const lookupData = await lookupResponse.json();
-    if (!Array.isArray(lookupData) || lookupData.length === 0) {
-      throw new Error('Intet jordstykke fundet her.');
-    }
-
-    const item = lookupData[0];
-    const href = item.href || item.data?.href;
-    if (!href) {
-      throw new Error('Jordstykke mangler geometri-link.');
-    }
-
-    const geoUrl = href.includes('?') ? `${href}&format=geojson` : `${href}?format=geojson`;
-    const geoResponse = await fetch(geoUrl);
-    if (!geoResponse.ok) {
-      throw new Error('Kunne ikke hente jordstykke-geometri.');
-    }
-
-    const geoJson = await geoResponse.json();
-    const geometry = geoJson.geometry || geoJson.features?.[0]?.geometry;
-    const newSegments = geoJsonToSegments(geometry);
-
-    if (newSegments.length === 0) {
-      throw new Error('Jordstykket har ingen brugbar polygon.');
-    }
-
-    pushUndoSnapshot();
-    newSegments.forEach((segment) => {
-      state.forestBoundary.push(segment);
-    });
-    rebuildEditableLayers();
-    selectSegment(state.forestBoundary.length - newSegments.length, true);
-    showStatus(`${newSegments.length} segment${newSegments.length === 1 ? '' : 'er'} importeret.`);
-  } catch (error) {
-    showStatus(error.message, 'error');
-  }
 }
 
 function initMap() {
@@ -561,6 +722,8 @@ function initMap() {
 
   state.editGroup = L.featureGroup().addTo(state.map);
 
+  state.map.pm.setGlobalOptions(SNAP_OPTIONS);
+
   state.map.pm.addControls({
     position: 'topleft',
     drawMarker: false,
@@ -571,6 +734,18 @@ function initMap() {
     drawText: false,
     cutPolygon: false,
     rotateMode: false,
+    snappingOption: true,
+  });
+
+  state.map.on('pm:drawstart', (event) => {
+    const drawTool = state.map.pm.Draw[event.shape];
+    attachMatrikelSnapTargets(drawTool);
+  });
+
+  state.map.on('pm:globaleditmodetoggled', (event) => {
+    if (event.enabled) {
+      attachMatrikelSnapTargetsToEditLayers();
+    }
   });
 
   state.map.on('pm:create', (event) => {
@@ -587,13 +762,6 @@ function initMap() {
     pushUndoSnapshot();
     syncFromMap();
     refreshLayerStyles();
-  });
-
-  state.map.on('click', (event) => {
-    if (!state.clickImportMode) {
-      return;
-    }
-    importJordstykke(event.latlng.lat, event.latlng.lng);
   });
 
   state.map.on('moveend zoomend', () => {
@@ -635,6 +803,7 @@ function loadInitialData() {
   state.audioPoints = embedded.audioPoints || [];
 
   updateMatrikelHint();
+  updateParcelSelectionUI();
 
   rebuildEditableLayers();
   renderPointMarkers();
@@ -707,9 +876,19 @@ els.toggleMatrikel.addEventListener('change', (event) => {
   toggleMatrikel(event.target.checked);
 });
 
-els.toggleClickImport.addEventListener('change', (event) => {
-  setClickImportMode(event.target.checked);
-});
+if (els.toggleParcelSelect) {
+  els.toggleParcelSelect.addEventListener('change', (event) => {
+    setParcelSelectMode(event.target.checked);
+  });
+}
+
+if (els.importParcels) {
+  els.importParcels.addEventListener('click', importSelectedParcels);
+}
+
+if (els.clearParcelSelection) {
+  els.clearParcelSelection.addEventListener('click', clearParcelSelection);
+}
 
 els.toggleMask.addEventListener('change', () => {
   renderMask();

@@ -81,9 +81,18 @@ $initialPoints = readPointsData();
               <span>Matrikelkort (jordstykker)</span>
             </label>
             <label class="toggle-row">
-              <input id="toggle-click-import" type="checkbox">
-              <span>Klik for at importere jordstykke</span>
+              <input id="toggle-parcel-select" type="checkbox">
+              <span>Vælg jordstykker</span>
             </label>
+            <p id="parcel-selection-info" class="text-[11px] text-stone-600 font-bold px-1">0 jordstykker valgt</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btn-import-parcels" type="button" class="px-3 py-2 rounded-xl bg-amber-700 text-white text-xs font-bold hover:bg-amber-800 transition-colors disabled:opacity-40" disabled>
+                Importer valgte
+              </button>
+              <button id="btn-clear-parcel-selection" type="button" class="px-3 py-2 rounded-xl bg-stone-100 text-[#1a3a32] text-xs font-bold hover:bg-stone-200 transition-colors disabled:opacity-40" disabled>
+                Ryd valg
+              </button>
+            </div>
             <label class="toggle-row">
               <input id="toggle-mask" type="checkbox" checked>
               <span>Preview-maske (som appen)</span>
@@ -114,8 +123,8 @@ $initialPoints = readPointsData();
             <p class="font-bold text-stone-700 mb-1">Tip</p>
             <ul class="list-disc pl-4 space-y-1">
               <li>Hvert polygon = ét segment i grænsen</li>
-              <li>Slå matrikel til og zoom ind for at se jordstykker</li>
-              <li>Slå klik-import til og klik på et jordstykke</li>
+              <li>Slå matrikel til, vælg jordstykker og klik Importer valgte</li>
+              <li>Eller tegn/rediger polygoner med Geoman-værktøjerne</li>
             </ul>
           </div>
         </div>
