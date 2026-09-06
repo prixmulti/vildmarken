@@ -1,0 +1,8 @@
+{
+  "name": "Nørholm 5",
+  "description": "En moderne og interaktiv lydguide til Nørholm Vildmark",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}

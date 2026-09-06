@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nørholm Vildmark – Interaktiv Lydguide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #1a2332;
+            --accent: #00ff9d;
+            --accent-dim: #00cc7d;
+            --text-primary: #ffffff;
+            --text-secondary: #8a9ab0;
+            --iphone-bezel: #1d1d1f;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #1a2332 50%, #0f1923 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 255, 157, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(0, 204, 255, 0.06) 0%, transparent 50%);
+            animation: pulse 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .content {
+            animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.1;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        h1 .highlight {
+            background: linear-gradient(135deg, var(--accent) 0%, #00ccff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            font-weight: 300;
+        }
+
+        .qr-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+            opacity: 0;
+            animation: fadeInUp 0.6s 1.2s forwards;
+        }
+
+        .qr-code {
+            background: white;
+            padding: 1rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 255, 157, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .qr-code:hover {
+            transform: scale(1.05);
+        }
+
+        .qr-code img {
+            display: block;
+            width: 180px;
+            height: 180px;
+        }
+
+        .qr-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .features {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.3s ease;
+            opacity: 0;
+            animation: fadeInUp 0.6s forwards;
+        }
+
+        .feature:nth-child(1) { animation-delay: 0.6s; }
+        .feature:nth-child(2) { animation-delay: 0.7s; }
+        .feature:nth-child(3) { animation-delay: 0.8s; }
+        .feature:nth-child(4) { animation-delay: 0.9s; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .feature:hover {
+            background: rgba(0, 255, 157, 0.08);
+            border-color: rgba(0, 255, 157, 0.2);
+            transform: translateX(8px);
+        }
+
+        .feature-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            color: var(--text-primary);
+            font-weight: 400;
+            font-size: 0.875rem;
+        }
+
+        /* Phone Container */
+        .phone-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .iphone {
+            width: 375px;
+            height: 760px;
+            background: var(--iphone-bezel);
+            border-radius: 55px;
+            padding: 15px;
+            box-shadow: 
+                0 50px 100px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+                0 0 80px rgba(0, 255, 157, 0.15);
+            position: relative;
+        }
+
+        /* Notch */
+        .iphone::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background: var(--iphone-bezel);
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        /* Dynamic Island effect */
+        .iphone::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 35px;
+            background: #000;
+            border-radius: 20px;
+            z-index: 11;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            border-radius: 45px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header bar with custom color */
+        .screen-header {
+            flex-shrink: 0;
+            background: #0f2b23;
+            height: 50px;
+            z-index: 5;
+        }
+
+        .screen iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            display: block;
+            background: #000;
+        }
+
+        /* Screen glow effect - removed hover state */
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+                text-align: center;
+            }
+
+            .content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .features {
+                max-width: 500px;
+            }
+
+            .qr-section {
+                align-items: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .description {
+                font-size: 0.9375rem;
+            }
+
+            .feature-text {
+                font-size: 0.8125rem;
+            }
+
+            .qr-code img {
+                width: 160px;
+                height: 160px;
+            }
+
+            .iphone {
+                width: 320px;
+                height: 650px;
+                border-radius: 45px;
+                padding: 12px;
+            }
+
+            .screen {
+                border-radius: 38px;
+            }
+
+            .screen-header {
+                height: 45px;
+            }
+
+            .iphone::before {
+                width: 130px;
+                height: 25px;
+                border-radius: 0 0 15px 15px;
+            }
+
+            .iphone::after {
+                width: 100px;
+                height: 28px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .description {
+                font-size: 0.875rem;
+            }
+
+            .qr-code img {
+                width: 140px;
+                height: 140px;
+            }
+
+            .iphone {
+                width: 280px;
+                height: 570px;
+            }
+
+            .screen-header {
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <h1><span class="highlight">Nørholm Vildmark</span></h1>
+
+            <p class="description">
+                Interaktiv GPS-baseret lydguide til Danmarks største private naturgenopretningsområde. Oplev rewilding i praksis.
+            </p>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">📍</div>
+                    <div class="feature-text">GPS-aktiverede fortællinger</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🦦</div>
+                    <div class="feature-text">Sjældne arter og naturprocesser</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌿</div>
+                    <div class="feature-text">Rewilding og biodiversitet</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔬</div>
+                    <div class="feature-text">Forskningsbaseret formidling</div>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <p class="qr-label">Scan QR-koden for at åbne lydguiden på din mobil</p>
+                <div class="qr-code">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://naturaudio.dk/vildmarken/app/" alt="QR-kode til Nørholm Vildmark lydguide">
+                </div>
+            </div>
+        </div>
+
+        <div class="phone-container">
+            <div class="iphone">
+                <div class="screen">
+                    <div class="screen-header"></div>
+                    <iframe 
+                        src="https://naturaudio.dk/vildmarken/app/" 
+                        title="Nørholm Vildmark App"
+                        allow="geolocation; microphone"
+                        loading="lazy"
+                    ></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

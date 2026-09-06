@@ -1,12 +1,11 @@
-# Nørholm Vildmark — Admin
+# Nørholm Vildmark — Lydguide + Admin
 
-Backend til at redigere lydpunkter og skovgrænsen for [Vildmarken lydguiden](https://naturaudio.dk/vildmarken/app/).
-
-Frontenden røres ikke i fase 1. Admin gemmer data i `data/points.json` og `data/boundary.json`, som senere kan bruges af appen.
+Interaktiv GPS-baseret lydguide for [Nørholm Vildmark](https://naturaudio.dk/vildmarken/) med admin-backend til punkter, grænse og lydfiler.
 
 ## Krav
 
 - PHP 8+
+- Node.js 18+ (til app-build)
 
 ## Start lokalt
 
@@ -17,67 +16,96 @@ php -S localhost:8080
 
 Åbn:
 
-- Lydpunkter: http://localhost:8080/admin/
+- Landing page: http://localhost:8080/
+- Lydguide (dev): `cd app && npm run dev` → http://localhost:3000/vildmarken/app/
+- Admin: http://localhost:8080/admin/
 - Grænse-editor: http://localhost:8080/admin/boundary.php
-- Login: adgangskode `dev123` (fra `admin/config.local.php`)
 
-## Test flow — lydpunkter
-
-1. Log ind på admin-siden
-2. Klik et punkt på kortet — formularen udfyldes
-3. Træk markøren — lat/lng opdateres
-4. Ret titel/beskrivelse og klik **Gem**
-5. Opret nyt punkt med **+ Nyt punkt**
-6. Slet et punkt med **Slet**
-7. Genindlæs siden og verificer at ændringerne ligger i `data/points.json`
-
-## Test flow — grænse-editor
-
-1. Gå til **Grænse-editor** fra admin-headeren
-2. Tegn eller rediger polygoner med værktøjerne på kortet
-3. Slå **Matrikelkort** til (kræver `DATAFORSYNINGEN_TOKEN` i config)
-4. Slå **Klik for at importere jordstykke** til og klik på et matrikel
-5. Klik **Gem grænse** og verificer `data/boundary.json`
+Login: adgangskode `dev123` (fra `admin/config.local.php`).
 
 ## Mappestruktur
 
 ```
 vildmarken/
-├── admin/           Admin UI + PHP API
-├── audio/           manifest.json (fallback til lydfil-liste)
-├── data/            points.json + boundary.json (beskyttet mod direkte adgang)
-└── nørholm-5.zip    Original Google AI Studio eksport
+├── index.html           Landing page
+├── api/                 Public read API til appen
+├── admin/               Admin UI + autentificerede API'er
+├── app/                 React/Vite lydguide (kildekode)
+├── audio/               MP3-filer + registry.json
+├── images/              JPEG-billeder pr. punkt (point-{id}.jpg)
+├── data/                points.json + boundary.json (beskyttet)
+└── nørholm-5.zip        Original Google AI Studio eksport
 ```
 
-## Produktion
+## Public API (ingen login)
 
-Upload til serveren:
+- `GET /vildmarken/api/points.php` → `{ "audioPoints": [...] }`
+- `GET /vildmarken/api/boundary.php` → `{ "forestBoundary": [...] }`
 
-- `admin/` → `/vildmarken/admin/`
-- `data/` → `/vildmarken/data/`
+`data/` er stadig blokeret via `.htaccess` — kun PHP-endpoints eksponerer JSON.
 
-Opret `admin/config.local.php` på serveren:
+## Admin API
+
+- `GET admin/api/points.php` — hent alle punkter (kræver login)
+- `POST admin/api/points.php` — `{ action: "create"|"update"|"delete", ... }`
+- `GET admin/api/audio-files.php` — liste over lydfiler
+- `POST admin/api/audio-upload.php` — upload MP3 til et punkt (`pointId` + fil) eller fjern (`{ action: "delete", pointId }`)
+- `POST admin/api/image-upload.php` — upload JPEG til et punkt (`pointId` + fil efter crop) eller fjern (`{ action: "delete", pointId }`)
+- `GET admin/api/boundary.php` — hent skovgrænse
+- `POST admin/api/boundary.php` — `{ forestBoundary: [[[lat,lng],...], ...] }`
+
+## Lydfiler
+
+Hver lydpunkt har sin egen dedikerede MP3-fil (`point-{id}.mp3`). Upload sker direkte på punktet i admin — gem punktet først, vælg fil, og klik **Upload lydfil**.
+
+## Punktbilleder
+
+Hvert punkt kan have ét JPEG-billede i 16:9 (`point-{id}.jpg`). I admin vælges og beskæres billedet med Cropper.js, skaleres til max 1200px bredde og uploades via **Upload billede**.
+
+Engangsmigration fra gamle undermapper (hvis relevant):
+
+```bash
+php admin/migrate-audio.php          # kør migration
+php admin/migrate-audio.php --dry-run # preview
+```
+
+## App-build
+
+```bash
+cd app
+npm install
+npm run build
+```
+
+Output i `app/dist/` — upload til `/vildmarken/app/` på serveren.
+
+## Deploy til produktion
+
+Rækkefølge:
+
+1. Upload `api/` → `/vildmarken/api/`
+2. Upload opdateret `admin/` → `/vildmarken/admin/`
+3. Kør migration på serveren: `php admin/migrate-audio.php` (eller besøg `/vildmarken/admin/migrate-audio.php` mens du er logget ind)
+4. Upload `audio/registry.json` og fladede MP3'er → `/vildmarken/audio/`
+5. Opret skrivbar `images/` mappe på serveren → `/vildmarken/images/` (JPEG pr. punkt)
+6. Upload `data/` → `/vildmarken/data/` (hvis points.json er opdateret med nye URLs)
+7. Build app lokalt og upload `app/dist/` → `/vildmarken/app/`
+
+`admin/config.local.php` på serveren:
 
 ```php
 <?php
 define('ADMIN_PASSWORD', 'din-stærke-adgangskode');
 define('DEBUG', false);
-
-// Datafordeler / Dataforsyningen API-nøgle til matrikelkort (WMS)
 define('DATAFORSYNINGEN_TOKEN', 'din-api-noegle');
 ```
 
-Alternativt via miljøvariabel: `VILDMARKEN_ADMIN_PASSWORD` og `DATAFORSYNINGEN_TOKEN`.
+## Test flow
 
-## API
+**Admin — lydpunkter:** Log ind → vælg punkt → rediger → Gem → verificer `data/points.json`.
 
-- `GET admin/api/points.php` — hent alle punkter (kræver login)
-- `POST admin/api/points.php` — `{ action: "create"|"update"|"delete", ... }`
-- `GET admin/api/audio-files.php` — liste over lydfiler
-- `GET admin/api/boundary.php` — hent skovgrænse (kræver login)
-- `POST admin/api/boundary.php` — `{ forestBoundary: [[[lat,lng],...], ...] }`
+**Admin — lydupload:** Vælg punkt → upload MP3 under Lydfil-kortet.
 
-## Næste skridt (fase 2)
+**Admin — billede:** Vælg punkt → vælg billede → crop 16:9 → upload → verificer `images/point-{id}.jpg`.
 
-- Frontend henter `points.json` og `boundary.json` i stedet for `constants.ts`
-- Upload af nye lydfiler via admin
+**App:** Åbn lydguiden → punkter og grænse hentes fra `/vildmarken/api/` → afspil lyd ved punkt → popup viser billede og kompakt player.

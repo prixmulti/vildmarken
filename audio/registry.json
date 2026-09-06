@@ -1,0 +1,102 @@
+{
+    "files": [
+        {
+            "id": "120-aars-stilhed",
+            "filename": "120-aars-stilhed.mp3",
+            "label": "120 aars stilhed",
+            "url": "https://naturaudio.dk/vildmarken/audio/120-aars-stilhed.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "den-uroerte-hede",
+            "filename": "den-uroerte-hede.mp3",
+            "label": "Den uroerte hede",
+            "url": "https://naturaudio.dk/vildmarken/audio/den-uroerte-hede.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "myrernes-hede",
+            "filename": "myrernes-hede.mp3",
+            "label": "Myrernes hede",
+            "url": "https://naturaudio.dk/vildmarken/audio/myrernes-hede.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "varde-aa-genslyngning",
+            "filename": "varde-aa-genslyngning.mp3",
+            "label": "Varde aa genslyngning",
+            "url": "https://naturaudio.dk/vildmarken/audio/varde-aa-genslyngning.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "ac-teilmann-oplysningstiden-paa-noerholm",
+            "filename": "ac-teilmann-oplysningstiden-paa-noerholm.mp3",
+            "label": "Ac teilmann oplysningstiden paa noerholm",
+            "url": "https://naturaudio.dk/vildmarken/audio/ac-teilmann-oplysningstiden-paa-noerholm.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "fredningen-hvordan-heden-blev-reddet",
+            "filename": "fredningen-hvordan-heden-blev-reddet.mp3",
+            "label": "Fredningen hvordan heden blev reddet",
+            "url": "https://naturaudio.dk/vildmarken/audio/fredningen-hvordan-heden-blev-reddet.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "gravhoejene-monumenter-fra-bronzealderen",
+            "filename": "gravhoejene-monumenter-fra-bronzealderen.mp3",
+            "label": "Gravhoejene monumenter fra bronzealderen",
+            "url": "https://naturaudio.dk/vildmarken/audio/gravhoejene-monumenter-fra-bronzealderen.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "stavnsbaandets-skygge-over-heden",
+            "filename": "stavnsbaandets-skygge-over-heden.mp3",
+            "label": "Stavnsbaandets skygge over heden",
+            "url": "https://naturaudio.dk/vildmarken/audio/stavnsbaandets-skygge-over-heden.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "toervegravernes-haarde-liv",
+            "filename": "toervegravernes-haarde-liv.mp3",
+            "label": "Toervegravernes haarde liv",
+            "url": "https://naturaudio.dk/vildmarken/audio/toervegravernes-haarde-liv.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "borgervidenskab-i-felten",
+            "filename": "borgervidenskab-i-felten.mp3",
+            "label": "Borgervidenskab i felten",
+            "url": "https://naturaudio.dk/vildmarken/audio/borgervidenskab-i-felten.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "en-national-vision",
+            "filename": "en-national-vision.mp3",
+            "label": "En national vision",
+            "url": "https://naturaudio.dk/vildmarken/audio/en-national-vision.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "noerholms-forvandling",
+            "filename": "noerholms-forvandling.mp3",
+            "label": "Noerholms forvandling",
+            "url": "https://naturaudio.dk/vildmarken/audio/noerholms-forvandling.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "oekosystemets-maskinrum",
+            "filename": "oekosystemets-maskinrum.mp3",
+            "label": "Oekosystemets maskinrum",
+            "url": "https://naturaudio.dk/vildmarken/audio/oekosystemets-maskinrum.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        },
+        {
+            "id": "respekt-for-videnskaben",
+            "filename": "respekt-for-videnskaben.mp3",
+            "label": "Respekt for videnskaben",
+            "url": "https://naturaudio.dk/vildmarken/audio/respekt-for-videnskaben.mp3",
+            "uploadedAt": "2026-09-06T06:02:06+00:00"
+        }
+    ]
+}

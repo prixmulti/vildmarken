@@ -6,7 +6,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
   requireAuth();
-  $data = readPointsData();
+  $data = readPointsDataOrFail();
   respond(true, $data);
 }
 
@@ -40,7 +40,7 @@ respond(false, null, 'Ukendt handling.', 400);
 function handleCreate(array $input): void
 {
   $validated = validatePointInput($input, true);
-  $data = readPointsData();
+  $data = readPointsDataOrFail();
   $points = $data['audioPoints'];
 
   $newPoint = [
@@ -56,7 +56,7 @@ function handleCreate(array $input): void
   $points[] = $newPoint;
   sortPointsById($points);
   $data['audioPoints'] = $points;
-  writePointsData($data);
+  writePointsDataOrFail($data);
 
   respond(true, ['point' => $newPoint, 'audioPoints' => $points], 'Punkt oprettet.');
 }
@@ -69,7 +69,7 @@ function handleUpdate(array $input): void
   }
 
   $validated = validatePointInput($input, false);
-  $data = readPointsData();
+  $data = readPointsDataOrFail();
   $points = $data['audioPoints'];
   $found = false;
 
@@ -108,7 +108,7 @@ function handleUpdate(array $input): void
 
   sortPointsById($points);
   $data['audioPoints'] = $points;
-  writePointsData($data);
+  writePointsDataOrFail($data);
 
   respond(true, ['audioPoints' => $points], 'Punkt opdateret.');
 }
@@ -120,7 +120,7 @@ function handleDelete(array $input): void
     respond(false, null, 'Ugyldigt punkt-id.');
   }
 
-  $data = readPointsData();
+  $data = readPointsDataOrFail();
   $points = $data['audioPoints'];
   $before = count($points);
   $points = array_values(array_filter($points, function ($point) use ($id) {
@@ -132,7 +132,7 @@ function handleDelete(array $input): void
   }
 
   $data['audioPoints'] = $points;
-  writePointsData($data);
+  writePointsDataOrFail($data);
 
   respond(true, ['audioPoints' => $points], 'Punkt slettet.');
 }

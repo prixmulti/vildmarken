@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/config.php';
+require_once __DIR__ . '/data-store.php';
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -25,52 +26,30 @@ function requireAuth(): void
   }
 }
 
-function readPointsData(): array
+function readPointsDataOrFail(): array
 {
-  if (!file_exists(DATA_FILE)) {
-    return [
-      'version' => 1,
-      'updatedAt' => date('c'),
-      'audioPoints' => [],
-    ];
+  try {
+    return readPointsData(true);
+  } catch (RuntimeException $e) {
+    respond(false, null, $e->getMessage(), 500);
   }
-
-  $raw = file_get_contents(DATA_FILE);
-  $data = json_decode($raw, true);
-  if (!is_array($data)) {
-    respond(false, null, 'Kunne ikke læse points.json.', 500);
-  }
-
-  if (!isset($data['audioPoints']) || !is_array($data['audioPoints'])) {
-    $data['audioPoints'] = [];
-  }
-
-  return $data;
 }
 
-function writePointsData(array $data): void
+function writePointsDataOrFail(array $data): void
 {
-  $dataDir = dirname(DATA_FILE);
-  if (!is_dir($dataDir)) {
-    mkdir($dataDir, 0755, true);
+  try {
+    writePointsData($data);
+  } catch (RuntimeException $e) {
+    respond(false, null, $e->getMessage(), 500);
   }
+}
 
-  $data['version'] = 1;
-  $data['updatedAt'] = date('c');
-
-  $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-  if ($json === false) {
-    respond(false, null, 'Kunne ikke serialisere data.', 500);
-  }
-
-  $tmpFile = DATA_FILE . '.tmp';
-  if (file_put_contents($tmpFile, $json . "\n", LOCK_EX) === false) {
-    respond(false, null, 'Kunne ikke skrive midlertidig fil.', 500);
-  }
-
-  if (!rename($tmpFile, DATA_FILE)) {
-    @unlink($tmpFile);
-    respond(false, null, 'Kunne ikke gemme points.json.', 500);
+function writeBoundaryDataOrFail(array $data): void
+{
+  try {
+    writeBoundaryData($data);
+  } catch (RuntimeException $e) {
+    respond(false, null, $e->getMessage(), 500);
   }
 }
 
@@ -88,8 +67,8 @@ function validatePointInput(array $input, bool $requireAll = true): array
   $lat = $input['lat'] ?? null;
   $lng = $input['lng'] ?? null;
 
-  if ($requireAll && ($title === '' || $description === '' || $audioSrc === '' || $category === '')) {
-    respond(false, null, 'Udfyld titel, beskrivelse, kategori og lydfil.');
+  if ($requireAll && ($title === '' || $description === '' || $category === '')) {
+    respond(false, null, 'Udfyld titel, beskrivelse og kategori.');
   }
 
   if ($category !== '' && !in_array($category, validCategories(), true)) {
@@ -130,63 +109,6 @@ function sortPointsById(array &$points): void
   usort($points, function ($a, $b) {
     return ($a['id'] ?? 0) <=> ($b['id'] ?? 0);
   });
-}
-
-function scanAudioFiles(): array
-{
-  $files = [
-    ['label' => 'Arkæologisk fund (ingen lyd)', 'value' => 'urne'],
-  ];
-
-  if (is_dir(AUDIO_DIR)) {
-    $subdirs = glob(AUDIO_DIR . '/*', GLOB_ONLYDIR) ?: [];
-    foreach ($subdirs as $subdir) {
-      $folder = basename($subdir);
-      $mp3s = glob($subdir . '/*.mp3') ?: [];
-      foreach ($mp3s as $mp3) {
-        $filename = basename($mp3);
-        $relative = $folder . '/' . $filename;
-        $files[] = [
-          'label' => $relative,
-          'value' => AUDIO_BASE_URL . '/' . $relative,
-        ];
-      }
-    }
-  }
-
-  if (count($files) === 1 && file_exists(AUDIO_MANIFEST)) {
-    $manifest = json_decode(file_get_contents(AUDIO_MANIFEST), true);
-    if (is_array($manifest) && isset($manifest['files']) && is_array($manifest['files'])) {
-      return $manifest['files'];
-    }
-  }
-
-  usort($files, function ($a, $b) {
-    if ($a['value'] === 'urne') {
-      return -1;
-    }
-    if ($b['value'] === 'urne') {
-      return 1;
-    }
-    return strcmp($a['label'], $b['label']);
-  });
-
-  return $files;
-}
-
-function readBoundaryData(): array
-{
-  if (!file_exists(BOUNDARY_FILE)) {
-    return ['forestBoundary' => []];
-  }
-
-  $raw = file_get_contents(BOUNDARY_FILE);
-  $data = json_decode($raw, true);
-  if (!is_array($data) || !isset($data['forestBoundary']) || !is_array($data['forestBoundary'])) {
-    return ['forestBoundary' => []];
-  }
-
-  return $data;
 }
 
 function validateBoundaryInput(array $input): array
@@ -236,31 +158,4 @@ function validateBoundaryInput(array $input): array
   }
 
   return ['forestBoundary' => $segments];
-}
-
-function writeBoundaryData(array $data): void
-{
-  $dataDir = dirname(BOUNDARY_FILE);
-  if (!is_dir($dataDir)) {
-    mkdir($dataDir, 0755, true);
-  }
-
-  $payload = [
-    'forestBoundary' => $data['forestBoundary'] ?? [],
-  ];
-
-  $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-  if ($json === false) {
-    respond(false, null, 'Kunne ikke serialisere grænsedata.', 500);
-  }
-
-  $tmpFile = BOUNDARY_FILE . '.tmp';
-  if (file_put_contents($tmpFile, $json . "\n", LOCK_EX) === false) {
-    respond(false, null, 'Kunne ikke skrive midlertidig fil.', 500);
-  }
-
-  if (!rename($tmpFile, BOUNDARY_FILE)) {
-    @unlink($tmpFile);
-    respond(false, null, 'Kunne ikke gemme boundary.json.', 500);
-  }
 }

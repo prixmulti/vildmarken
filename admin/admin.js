@@ -8,8 +8,6 @@ const CATEGORY_COLORS = {
   Rewild: '#1e40af',
 };
 
-const URN_PATH = 'M5.42,1.11c0,.74,1.73,2.21,3.94,3.5,3.7,1.84,3.45,3.14-2.71,12.36L0,27.3l6.41,8.67c3.7,4.61,6.16,9.96,5.92,11.62-.49,2.58,1.48,3.14,10.35,3.14s10.84-.55,10.35-3.14c-.25-1.66,2.22-7.01,5.92-11.62l6.41-8.67-6.65-10.33c-6.16-9.22-6.41-10.51-2.71-12.36C42.89.74,40.42,0,22.68,0,13.31,0,5.42.55,5.42,1.11Z';
-
 const state = {
   map: null,
   clusterGroup: null,
@@ -18,10 +16,14 @@ const state = {
   boundaryLayers: [],
   points: [],
   forestBoundary: [],
-  audioFiles: [],
   selectedId: null,
   isNew: false,
+  isReplacingAudio: false,
+  isReplacingImage: false,
   statusTimer: null,
+  currentAudioSrc: '',
+  currentImageSrc: '',
+  isUploadingImage: false,
 };
 
 const els = {
@@ -31,14 +33,43 @@ const els = {
   loadError: document.getElementById('load-error'),
   form: document.getElementById('point-form'),
   subtitle: document.getElementById('editor-subtitle'),
+  pointBadge: document.getElementById('editor-point-badge'),
   statusBadge: document.getElementById('status-badge'),
   id: document.getElementById('point-id'),
   title: document.getElementById('point-title'),
   description: document.getElementById('point-description'),
   category: document.getElementById('point-category'),
-  audio: document.getElementById('point-audio'),
+  audioSrc: document.getElementById('point-audio-src'),
+  audioIdle: document.getElementById('audio-panel-idle'),
+  audioLocked: document.getElementById('audio-panel-locked'),
+  audioAttached: document.getElementById('audio-panel-attached'),
+  audioUpload: document.getElementById('audio-panel-upload'),
+  audioPending: document.getElementById('audio-panel-pending'),
+  audioAttachedName: document.getElementById('audio-attached-name'),
+  audioPendingName: document.getElementById('audio-pending-name'),
+  audioFile: document.getElementById('point-audio-file'),
+  audioPick: document.getElementById('btn-audio-pick'),
+  audioUploadBtn: document.getElementById('btn-point-audio-upload'),
+  audioCancel: document.getElementById('btn-audio-cancel'),
+  audioReplace: document.getElementById('btn-audio-replace'),
+  audioReplaceCancel: document.getElementById('btn-audio-replace-cancel'),
+  audioDropzoneTitle: document.getElementById('audio-dropzone-title'),
+  audioDropzoneSub: document.getElementById('audio-dropzone-sub'),
+  audioRemove: document.getElementById('btn-point-audio-remove'),
   audioPlay: document.getElementById('btn-audio-play'),
   audioPreview: document.getElementById('audio-preview'),
+  imageIdle: document.getElementById('image-panel-idle'),
+  imageLocked: document.getElementById('image-panel-locked'),
+  imageAttached: document.getElementById('image-panel-attached'),
+  imageUpload: document.getElementById('image-panel-upload'),
+  imageAttachedPreview: document.getElementById('image-attached-preview'),
+  imageFile: document.getElementById('point-image-file'),
+  imagePick: document.getElementById('btn-image-pick'),
+  imageReplace: document.getElementById('btn-image-replace'),
+  imageReplaceCancel: document.getElementById('btn-image-replace-cancel'),
+  imageDropzoneTitle: document.getElementById('image-dropzone-title'),
+  imageDropzoneSub: document.getElementById('image-dropzone-sub'),
+  imageRemove: document.getElementById('btn-point-image-remove'),
   lat: document.getElementById('point-lat'),
   lng: document.getElementById('point-lng'),
   save: document.getElementById('btn-save'),
@@ -94,13 +125,11 @@ function hideLoadError() {
 
 function createMarkerIcon(point, isActive = false) {
   const color = CATEGORY_COLORS[point.category] || '#1a3a32';
-  const isArchaeology = point.audioSrc === 'urne';
-  const urnIcon = `<svg viewBox="0 0 45.35 50.73" width="18" height="18" fill="white"><path d="${URN_PATH}" /></svg>`;
   const audioIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
 
   return L.divIcon({
     className: `custom-div-icon ${isActive ? 'marker-active' : ''}`,
-    html: `<div class="marker-circle" style="background-color:${color}">${isArchaeology ? urnIcon : audioIcon}</div>`,
+    html: `<div class="marker-circle" style="background-color:${color}">${audioIcon}</div>`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   });
@@ -283,18 +312,387 @@ function renderMarkers() {
   renderPointList();
 }
 
-function populateAudioSelect(selectedValue = '') {
-  els.audio.innerHTML = '';
-  state.audioFiles.forEach((file) => {
-    const option = document.createElement('option');
-    option.value = file.value;
-    option.textContent = file.label;
-    if (file.value === selectedValue) {
-      option.selected = true;
+function audioFilenameFromSrc(src) {
+  if (!src) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(src.split('/').pop() || '');
+  } catch (error) {
+    return src.split('/').pop() || '';
+  }
+}
+
+function setPanelVisible(panel, visible) {
+  if (!panel) {
+    return;
+  }
+  panel.classList.toggle('hidden', !visible);
+}
+
+function clearPendingImageSelection() {
+  if (els.imageFile) {
+    els.imageFile.value = '';
+  }
+  state.isReplacingImage = false;
+}
+
+function updatePointImageUI() {
+  const hasSelection = state.selectedId && state.selectedId !== 'new';
+  const imageSrc = state.currentImageSrc || '';
+
+  setPanelVisible(els.imageIdle, !state.selectedId);
+  setPanelVisible(els.imageLocked, state.isNew);
+  setPanelVisible(
+    els.imageAttached,
+    hasSelection && Boolean(imageSrc) && !state.isReplacingImage && !state.isUploadingImage,
+  );
+  setPanelVisible(
+    els.imageUpload,
+    hasSelection && (!imageSrc || state.isReplacingImage || state.isUploadingImage),
+  );
+
+  if (hasSelection && imageSrc && els.imageAttachedPreview) {
+    els.imageAttachedPreview.src = imageSrc;
+  }
+
+  if (els.imageDropzoneTitle) {
+    if (state.isUploadingImage) {
+      els.imageDropzoneTitle.textContent = 'Uploader billede…';
+    } else {
+      els.imageDropzoneTitle.textContent = state.isReplacingImage ? 'Vælg nyt billede' : 'Vælg billede';
     }
-    els.audio.appendChild(option);
+  }
+  if (els.imageDropzoneSub) {
+    els.imageDropzoneSub.textContent = state.isUploadingImage
+      ? 'Vent et øjeblik'
+      : state.isReplacingImage
+        ? 'Erstatter det nuværende billede'
+        : 'Beskær og upload i ét trin';
+  }
+  setPanelVisible(
+    els.imageReplaceCancel,
+    hasSelection && state.isReplacingImage && !state.isUploadingImage && Boolean(imageSrc),
+  );
+
+  if (els.imagePick) {
+    els.imagePick.disabled = state.isUploadingImage;
+  }
+  if (els.imageReplace) {
+    els.imageReplace.disabled = state.isUploadingImage;
+  }
+}
+
+async function uploadPointImage(blob) {
+  if (state.isNew || !state.selectedId) {
+    showStatus('Gem punktet først — derefter kan du uploade billede.', 'error');
+    return false;
+  }
+
+  if (!(blob instanceof Blob)) {
+    showStatus('Vælg et billede først.', 'error');
+    return false;
+  }
+
+  const formData = new FormData();
+  formData.append('file', blob, `point-${state.selectedId}.jpg`);
+  formData.append('pointId', String(state.selectedId));
+
+  state.isUploadingImage = true;
+  updatePointImageUI();
+
+  try {
+    const response = await fetch(`${API_BASE}/image-upload.php`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+      if (response.status === 401) {
+        window.location.href = 'login.php';
+      }
+      throw new Error(payload.message || 'Upload fejlede.');
+    }
+
+    const updatedPoint = payload.data.point;
+    if (updatedPoint) {
+      state.points = state.points.map((point) => (
+        point.id === updatedPoint.id ? updatedPoint : point
+      ));
+      state.currentImageSrc = updatedPoint.imageSrc || payload.data.imageSrc || '';
+    } else {
+      state.currentImageSrc = payload.data.imageSrc || '';
+    }
+
+    clearPendingImageSelection();
+    updatePointImageUI();
+    showStatus('Billede uploadet til punktet.');
+    return true;
+  } catch (error) {
+    showStatus(error.message, 'error');
+    return false;
+  } finally {
+    state.isUploadingImage = false;
+    updatePointImageUI();
+  }
+}
+
+async function removePointImage() {
+  if (state.isNew || !state.selectedId) {
+    return;
+  }
+
+  const confirmed = window.confirm('Fjern billedet fra dette punkt?');
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const result = await api('image-upload.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'delete',
+        pointId: state.selectedId,
+      }),
+    });
+
+    const updatedPoint = result.point;
+    if (updatedPoint) {
+      state.points = state.points.map((point) => (
+        point.id === updatedPoint.id ? updatedPoint : point
+      ));
+      state.currentImageSrc = updatedPoint.imageSrc || '';
+    } else {
+      state.currentImageSrc = '';
+    }
+
+    clearPendingImageSelection();
+    updatePointImageUI();
+    showStatus('Billede fjernet.');
+  } catch (error) {
+    showStatus(error.message, 'error');
+  }
+}
+
+async function handleImageFileSelected(file) {
+  if (!file) {
+    updatePointImageUI();
+    return;
+  }
+
+  if (!window.ImageCropper) {
+    showStatus('Billede-cropper kunne ikke indlæses.', 'error');
+    return;
+  }
+
+  try {
+    const blob = await window.ImageCropper.open(file);
+    await uploadPointImage(blob);
+  } catch (error) {
+    if (error.message !== 'Crop annulleret.') {
+      showStatus(error.message, 'error');
+    }
+    clearPendingImageSelection();
+    updatePointImageUI();
+  }
+}
+
+if (els.imageRemove) {
+  els.imageRemove.addEventListener('click', removePointImage);
+}
+
+if (els.imagePick) {
+  els.imagePick.addEventListener('click', () => {
+    els.imageFile?.click();
   });
+}
+
+if (els.imageFile) {
+  els.imageFile.addEventListener('change', () => {
+    const file = els.imageFile.files?.[0];
+    if (!file) {
+      updatePointImageUI();
+      return;
+    }
+    handleImageFileSelected(file);
+  });
+}
+
+if (els.imageReplace) {
+  els.imageReplace.addEventListener('click', () => {
+    state.isReplacingImage = true;
+    if (els.imageFile) {
+      els.imageFile.value = '';
+    }
+    updatePointImageUI();
+    els.imageFile?.click();
+  });
+}
+
+if (els.imageReplaceCancel) {
+  els.imageReplaceCancel.addEventListener('click', () => {
+    clearPendingImageSelection();
+    updatePointImageUI();
+  });
+}
+
+function clearPendingAudioSelection() {
+  if (els.audioFile) {
+    els.audioFile.value = '';
+  }
+  state.isReplacingAudio = false;
+}
+
+function updateEditorBadge() {
+  if (!els.pointBadge) {
+    return;
+  }
+
+  if (state.selectedId && state.selectedId !== 'new') {
+    els.pointBadge.textContent = `#${state.selectedId}`;
+    els.pointBadge.classList.remove('hidden');
+    return;
+  }
+
+  els.pointBadge.classList.add('hidden');
+}
+
+function updatePointAudioUI() {
+  const hasSelection = state.selectedId && state.selectedId !== 'new';
+  const audioSrc = state.currentAudioSrc || '';
+  const hasPendingFile = Boolean(els.audioFile?.files?.length);
+
+  if (els.audioSrc) {
+    els.audioSrc.value = audioSrc;
+  }
+
+  setPanelVisible(els.audioIdle, !state.selectedId);
+  setPanelVisible(els.audioLocked, state.isNew);
+  setPanelVisible(els.audioAttached, hasSelection && Boolean(audioSrc) && !hasPendingFile && !state.isReplacingAudio);
+  setPanelVisible(els.audioUpload, hasSelection && (!audioSrc || state.isReplacingAudio) && !hasPendingFile);
+  setPanelVisible(els.audioPending, hasSelection && hasPendingFile);
+
+  if (hasSelection && audioSrc && els.audioAttachedName) {
+    els.audioAttachedName.textContent = audioFilenameFromSrc(audioSrc);
+  }
+
+  if (hasPendingFile && els.audioPendingName && els.audioFile?.files?.[0]) {
+    els.audioPendingName.textContent = els.audioFile.files[0].name;
+  }
+
+  if (els.audioDropzoneTitle) {
+    els.audioDropzoneTitle.textContent = state.isReplacingAudio ? 'Vælg ny lydfil' : 'Vælg lydfil';
+  }
+  if (els.audioDropzoneSub) {
+    els.audioDropzoneSub.textContent = state.isReplacingAudio
+      ? 'Erstatter den nuværende MP3'
+      : 'Klik for at vælge MP3';
+  }
+  setPanelVisible(
+    els.audioReplaceCancel,
+    hasSelection && state.isReplacingAudio && !hasPendingFile && Boolean(audioSrc),
+  );
+
+  updateEditorBadge();
   updateAudioPlayButton();
+}
+
+async function uploadPointAudio() {
+  if (state.isNew || !state.selectedId) {
+    showStatus('Gem punktet først — derefter kan du uploade lydfil.', 'error');
+    return;
+  }
+
+  if (!els.audioFile?.files?.length) {
+    showStatus('Vælg en MP3-fil først.', 'error');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', els.audioFile.files[0]);
+  formData.append('pointId', String(state.selectedId));
+  if (els.title?.value.trim()) {
+    formData.append('label', els.title.value.trim());
+  }
+
+  els.audioUploadBtn.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE}/audio-upload.php`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+      if (response.status === 401) {
+        window.location.href = 'login.php';
+      }
+      throw new Error(payload.message || 'Upload fejlede.');
+    }
+
+    const updatedPoint = payload.data.point;
+    if (updatedPoint) {
+      state.points = state.points.map((point) => (
+        point.id === updatedPoint.id ? updatedPoint : point
+      ));
+      state.currentAudioSrc = updatedPoint.audioSrc || payload.data.audioSrc || '';
+    } else {
+      state.currentAudioSrc = payload.data.audioSrc || '';
+    }
+
+    els.audioFile.value = '';
+    clearPendingAudioSelection();
+    updatePointAudioUI();
+    renderMarkers();
+    showStatus('Lydfil uploadet til punktet.');
+  } catch (error) {
+    showStatus(error.message, 'error');
+  } finally {
+    els.audioUploadBtn.disabled = false;
+  }
+}
+
+async function removePointAudio() {
+  if (state.isNew || !state.selectedId) {
+    return;
+  }
+
+  const confirmed = window.confirm('Fjern lydfilen fra dette punkt?');
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const result = await api('audio-upload.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'delete',
+        pointId: state.selectedId,
+      }),
+    });
+
+    const updatedPoint = result.point;
+    if (updatedPoint) {
+      state.points = state.points.map((point) => (
+        point.id === updatedPoint.id ? updatedPoint : point
+      ));
+      state.currentAudioSrc = updatedPoint.audioSrc || '';
+    } else {
+      state.currentAudioSrc = '';
+    }
+
+    stopAudioPreview();
+    clearPendingAudioSelection();
+    updatePointAudioUI();
+    renderMarkers();
+    showStatus('Lydfil fjernet.');
+  } catch (error) {
+    showStatus(error.message, 'error');
+  }
 }
 
 function stopAudioPreview() {
@@ -317,7 +715,7 @@ function updateAudioPlayButton() {
   if (!els.audioPlay) {
     return;
   }
-  const canPlay = els.audio.value && els.audio.value !== 'urne';
+  const canPlay = Boolean(state.currentAudioSrc);
   els.audioPlay.disabled = !canPlay;
   if (!canPlay) {
     stopAudioPreview();
@@ -334,8 +732,8 @@ function toggleAudioPreview() {
     return;
   }
 
-  const src = els.audio.value;
-  if (!src || src === 'urne') {
+  const src = state.currentAudioSrc;
+  if (!src) {
     return;
   }
 
@@ -352,15 +750,57 @@ if (els.audioPreview) {
   els.audioPreview.addEventListener('ended', () => setAudioPlayState(false));
 }
 
-if (els.audio) {
-  els.audio.addEventListener('change', () => {
-    stopAudioPreview();
-    updateAudioPlayButton();
+if (els.audioPlay) {
+  els.audioPlay.addEventListener('click', toggleAudioPreview);
+}
+
+if (els.audioUploadBtn) {
+  els.audioUploadBtn.addEventListener('click', uploadPointAudio);
+}
+
+if (els.audioRemove) {
+  els.audioRemove.addEventListener('click', removePointAudio);
+}
+
+if (els.audioPick) {
+  els.audioPick.addEventListener('click', () => {
+    els.audioFile?.click();
   });
 }
 
-if (els.audioPlay) {
-  els.audioPlay.addEventListener('click', toggleAudioPreview);
+if (els.audioFile) {
+  els.audioFile.addEventListener('change', () => {
+    if (!els.audioFile.files?.length) {
+      updatePointAudioUI();
+      return;
+    }
+    updatePointAudioUI();
+  });
+}
+
+if (els.audioCancel) {
+  els.audioCancel.addEventListener('click', () => {
+    clearPendingAudioSelection();
+    updatePointAudioUI();
+  });
+}
+
+if (els.audioReplace) {
+  els.audioReplace.addEventListener('click', () => {
+    state.isReplacingAudio = true;
+    if (els.audioFile) {
+      els.audioFile.value = '';
+    }
+    updatePointAudioUI();
+    els.audioFile?.click();
+  });
+}
+
+if (els.audioReplaceCancel) {
+  els.audioReplaceCancel.addEventListener('click', () => {
+    clearPendingAudioSelection();
+    updatePointAudioUI();
+  });
 }
 
 function setEditorEnabled(enabled) {
@@ -375,33 +815,50 @@ function clearForm() {
   }
 
   stopAudioPreview();
+  clearPendingImageSelection();
   state.selectedId = null;
   state.isNew = false;
+  state.currentAudioSrc = '';
+  state.currentImageSrc = '';
+  state.isReplacingAudio = false;
   els.id.value = '';
   els.title.value = '';
   els.description.value = '';
   els.category.value = 'Historie';
-  populateAudioSelect(state.audioFiles[0]?.value || 'urne');
   els.lat.value = '';
   els.lng.value = '';
   els.subtitle.textContent = 'Vælg et punkt på kortet eller i listen';
+  if (els.audioFile) {
+    els.audioFile.value = '';
+  }
   setEditorEnabled(false);
+  updatePointAudioUI();
+  updatePointImageUI();
   renderMarkers();
 }
 
 function fillForm(point) {
   stopAudioPreview();
+  clearPendingAudioSelection();
+  clearPendingImageSelection();
   state.selectedId = point.id;
   state.isNew = false;
+  state.isReplacingAudio = false;
   els.id.value = String(point.id);
   els.title.value = point.title;
   els.description.value = point.description;
   els.category.value = point.category;
-  populateAudioSelect(point.audioSrc);
+  state.currentAudioSrc = point.audioSrc || '';
+  state.currentImageSrc = point.imageSrc || '';
   els.lat.value = point.lat;
   els.lng.value = point.lng;
   els.subtitle.textContent = `Redigerer punkt #${point.id}`;
+  if (els.audioFile) {
+    els.audioFile.value = '';
+  }
   setEditorEnabled(true);
+  updatePointAudioUI();
+  updatePointImageUI();
   renderMarkers();
 }
 
@@ -424,7 +881,7 @@ function getFormData() {
     title: els.title.value.trim(),
     description: els.description.value.trim(),
     category: els.category.value,
-    audioSrc: els.audio.value,
+    audioSrc: state.currentAudioSrc,
     lat: Number(els.lat.value),
     lng: Number(els.lng.value),
   };
@@ -465,18 +922,9 @@ async function loadInitialData() {
   if (embedded) {
     state.points = embedded.audioPoints || [];
     state.forestBoundary = embedded.forestBoundary || [];
-    state.audioFiles = embedded.audioFiles || [];
   } else {
     const pointsData = await api('points.php');
     state.points = pointsData.audioPoints || [];
-
-    try {
-      const audioData = await api('audio-files.php');
-      state.audioFiles = audioData.files || [];
-    } catch (error) {
-      showStatus(`Lydfiler kunne ikke hentes: ${error.message}`, 'error');
-      state.audioFiles = [{ label: 'Arkæologisk fund (ingen lyd)', value: 'urne' }];
-    }
 
     try {
       const boundaryData = await api('boundary.php');
@@ -487,7 +935,8 @@ async function loadInitialData() {
     }
   }
 
-  populateAudioSelect();
+  updatePointAudioUI();
+  updatePointImageUI();
   renderBoundary();
   renderMarkers();
   fitMapToContent();
@@ -500,6 +949,7 @@ async function loadInitialData() {
 
 els.newBtn.addEventListener('click', () => {
   stopAudioPreview();
+  clearPendingImageSelection();
 
   if (state.clusterGroup) {
     state.clusterGroup.clearLayers();
@@ -518,10 +968,17 @@ els.newBtn.addEventListener('click', () => {
   els.title.value = '';
   els.description.value = '';
   els.category.value = 'Historie';
-  populateAudioSelect(state.audioFiles[0]?.value || 'urne');
+  state.currentAudioSrc = '';
+  state.currentImageSrc = '';
   updateFormCoords(center.lat, center.lng);
   els.subtitle.textContent = 'Nyt punkt — udfyld felter og gem';
+  state.isReplacingAudio = false;
+  if (els.audioFile) {
+    els.audioFile.value = '';
+  }
   setEditorEnabled(true);
+  updatePointAudioUI();
+  updatePointImageUI();
   renderPointList();
 
   const draftPoint = {
@@ -529,7 +986,7 @@ els.newBtn.addEventListener('click', () => {
     lat: center.lat,
     lng: center.lng,
     category: 'Historie',
-    audioSrc: els.audio.value,
+    audioSrc: '',
   };
 
   const marker = L.marker([center.lat, center.lng], {
@@ -550,8 +1007,8 @@ els.form.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const data = getFormData();
-  if (!data.title || !data.description || !data.audioSrc) {
-    showStatus('Udfyld alle felter.', 'error');
+  if (!data.title || !data.description) {
+    showStatus('Udfyld titel og beskrivelse.', 'error');
     return;
   }
 
@@ -572,6 +1029,7 @@ els.form.addEventListener('submit', async (event) => {
       }
       if (result.point) {
         state.selectedId = result.point.id;
+        state.currentAudioSrc = result.point.audioSrc || state.currentAudioSrc;
       }
       showStatus('Nyt punkt oprettet.');
     } else {
@@ -589,6 +1047,9 @@ els.form.addEventListener('submit', async (event) => {
     renderMarkers();
     if (state.selectedId) {
       selectPoint(state.selectedId);
+    } else {
+      updatePointAudioUI();
+      updatePointImageUI();
     }
   } catch (error) {
     showStatus(error.message, 'error');

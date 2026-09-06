@@ -21,6 +21,6 @@ if (!is_array($input)) {
 }
 
 $validated = validateBoundaryInput($input);
-writeBoundaryData($validated);
+writeBoundaryDataOrFail($validated);
 
 respond(true, $validated, 'Grænse gemt.');

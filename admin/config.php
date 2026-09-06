@@ -4,7 +4,13 @@ define('VILDMARKEN_ROOT', dirname(__DIR__));
 define('DATA_FILE', VILDMARKEN_ROOT . '/data/points.json');
 define('AUDIO_DIR', VILDMARKEN_ROOT . '/audio');
 define('AUDIO_MANIFEST', AUDIO_DIR . '/manifest.json');
+define('AUDIO_REGISTRY', AUDIO_DIR . '/registry.json');
+define('AUDIO_MAX_BYTES', 20 * 1024 * 1024);
 define('AUDIO_BASE_URL', 'https://naturaudio.dk/vildmarken/audio');
+define('IMAGE_DIR', VILDMARKEN_ROOT . '/images');
+define('IMAGE_BASE_URL', 'https://naturaudio.dk/vildmarken/images');
+define('IMAGE_MAX_BYTES', 3 * 1024 * 1024);
+define('IMAGE_MAX_WIDTH', 1200);
 define('BOUNDARY_FILE', VILDMARKEN_ROOT . '/data/boundary.json');
 
 $localConfig = __DIR__ . '/config.local.php';
