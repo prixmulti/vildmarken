@@ -34,6 +34,21 @@
         background-color: #022c22;
       }
 
+      :root {
+        --info-panel-top: calc(env(safe-area-inset-top) + 7.25rem + 0.5rem);
+        --info-panel-max-height: calc(100dvh - env(safe-area-inset-top) - 7.75rem - 1rem);
+      }
+
+      .info-panel {
+        top: var(--info-panel-top);
+        max-height: var(--info-panel-max-height);
+      }
+
+      .info-panel-body {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+
       /* Outdooractive-inspireret kortbase */
       .leaflet-container {
         height: 100%;

@@ -40,6 +40,7 @@ $initialBoundary = readBoundaryData();
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <a href="boundary.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Grænse-editor</a>
+        <a href="stats.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Statistik</a>
         <span id="status-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full"></span>
         <a href="logout.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Log ud</a>
       </div>
@@ -75,11 +76,11 @@ $initialBoundary = readBoundaryData();
       </section>
 
       <section class="editor-panel bg-white rounded-[1.5rem] shadow-sm border border-stone-200 overflow-hidden flex flex-col admin-panel">
-        <div class="editor-panel-header px-5 py-4 border-b border-stone-100">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h2 class="font-black text-[#1a3a32] text-lg">Rediger punkt</h2>
-              <p id="editor-subtitle" class="text-sm text-stone-500 mt-0.5">Vælg et punkt på kortet</p>
+        <div class="editor-panel-header px-4 py-2.5 border-b border-stone-100">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <h2 class="font-black text-[#1a3a32] text-base leading-tight">Rediger punkt</h2>
+              <p id="editor-subtitle" class="text-xs text-stone-500 truncate">Vælg et punkt på kortet</p>
             </div>
             <span id="editor-point-badge" class="editor-point-badge hidden">#0</span>
           </div>
@@ -92,42 +93,45 @@ $initialBoundary = readBoundaryData();
           <div class="editor-section">
             <h3 class="editor-section-title">Grunddata</h3>
             <div class="editor-fields">
-              <div>
-                <label for="point-title" class="field-label">Titel</label>
-                <input id="point-title" type="text" required class="field-input" placeholder="Punktets overskrift">
+              <div class="editor-fields-row-2">
+                <div class="editor-field-grow">
+                  <label for="point-title" class="field-label">Titel</label>
+                  <input id="point-title" type="text" required class="field-input field-input-compact" placeholder="Punktets overskrift">
+                </div>
+                <div class="editor-field-category">
+                  <label for="point-category" class="field-label">Kategori</label>
+                  <select id="point-category" class="field-input field-input-compact">
+                    <option value="Historie">Historie</option>
+                    <option value="Natur">Natur</option>
+                    <option value="Rewild">Rewild</option>
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label for="point-description" class="field-label">Beskrivelse</label>
-                <textarea id="point-description" rows="5" required class="field-input resize-y min-h-[110px]" placeholder="Tekst der vises i lydguiden"></textarea>
+                <textarea id="point-description" rows="3" required class="field-input field-input-compact resize-y min-h-[72px]" placeholder="Tekst der vises i lydguiden"></textarea>
               </div>
 
-              <div>
-                <label for="point-category" class="field-label">Kategori</label>
-                <select id="point-category" class="field-input">
-                  <option value="Historie">Historie</option>
-                  <option value="Natur">Natur</option>
-                  <option value="Rewild">Rewild</option>
-                </select>
+              <div class="editor-fields-coords">
+                <div>
+                  <label for="point-lat" class="field-label">Breddegrad</label>
+                  <input id="point-lat" type="number" step="any" required class="field-input field-input-compact field-input-mono">
+                </div>
+                <div>
+                  <label for="point-lng" class="field-label">Længdegrad</label>
+                  <input id="point-lng" type="number" step="any" required class="field-input field-input-compact field-input-mono">
+                </div>
               </div>
             </div>
           </div>
 
           <div class="editor-section">
             <h3 class="editor-section-title">Medier</h3>
-            <p class="editor-section-desc">Hvert punkt har sin egen lydfil og ét billede i bredformat.</p>
 
-            <div class="media-grid">
-              <div class="media-card media-card-audio">
-                <div class="media-card-head">
-                  <div class="media-card-icon media-card-icon-audio" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                  </div>
-                  <div>
-                    <p class="media-card-label">Lydfil</p>
-                    <p class="media-card-hint">MP3 · max 20 MB</p>
-                  </div>
-                </div>
+            <div class="media-grid media-grid-compact">
+              <div class="media-card media-card-audio media-card-compact">
+                <p class="media-card-label media-card-label-inline">Lydfil <span class="media-card-hint">· MP3</span></p>
 
                 <div id="audio-panel-idle" class="media-empty">
                   Vælg et punkt for at administrere lydfil.
@@ -137,22 +141,16 @@ $initialBoundary = readBoundaryData();
                   Gem punktet først — derefter kan du tilknytte en lydfil.
                 </div>
 
-                <div id="audio-panel-attached" class="media-attached hidden">
-                  <div class="media-attached-main">
-                    <div class="media-attached-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                    </div>
-                    <div class="media-attached-meta">
-                      <span class="media-attached-badge">Aktiv lydfil</span>
-                      <p id="audio-attached-name" class="media-attached-name">fil.mp3</p>
-                    </div>
-                    <button type="button" id="btn-audio-play" class="media-icon-btn" title="Afspil" disabled aria-label="Afspil lydfil">
-                      <svg class="icon-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="8 5 19 12 8 19 8 5"></polygon></svg>
-                      <svg class="icon-pause hidden" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="7" y="5" width="4" height="14"></rect><rect x="13" y="5" width="4" height="14"></rect></svg>
+                <div id="audio-panel-attached" class="media-attached media-attached-compact hidden">
+                  <div class="media-attached-main media-attached-main-compact">
+                    <button type="button" id="btn-audio-play" class="media-icon-btn media-icon-btn-sm" title="Afspil" disabled aria-label="Afspil lydfil">
+                      <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="8 5 19 12 8 19 8 5"></polygon></svg>
+                      <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14"></rect><rect x="13" y="5" width="4" height="14"></rect></svg>
                     </button>
+                    <p id="audio-attached-name" class="media-attached-name media-attached-name-compact">fil.mp3</p>
                   </div>
-                  <div class="media-attached-actions">
-                    <button type="button" id="btn-audio-replace" class="media-text-btn">Udskift lydfil</button>
+                  <div class="media-attached-actions media-attached-actions-inline media-attached-actions-audio">
+                    <button type="button" id="btn-audio-replace" class="media-text-btn">Udskift</button>
                     <button type="button" id="btn-point-audio-remove" class="media-text-btn danger">Fjern</button>
                   </div>
                 </div>
@@ -163,34 +161,17 @@ $initialBoundary = readBoundaryData();
                     <span class="media-dropzone-icon" aria-hidden="true">
                       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
                     </span>
-                    <span id="audio-dropzone-title" class="media-dropzone-title">Vælg lydfil</span>
-                    <span id="audio-dropzone-sub" class="media-dropzone-sub">Klik for at vælge MP3</span>
+                    <span class="media-dropzone-copy">
+                      <span id="audio-dropzone-title" class="media-dropzone-title">Vælg lydfil</span>
+                      <span id="audio-dropzone-sub" class="media-dropzone-sub">MP3</span>
+                    </span>
                   </button>
                   <button type="button" id="btn-audio-replace-cancel" class="media-text-btn media-replace-cancel hidden">Behold nuværende fil</button>
                 </div>
-
-                <div id="audio-panel-pending" class="media-pending hidden">
-                  <div class="media-pending-info">
-                    <span class="media-pending-label">Klar til upload</span>
-                    <p id="audio-pending-name" class="media-pending-name">fil.mp3</p>
-                  </div>
-                  <div class="media-pending-actions">
-                    <button type="button" id="btn-point-audio-upload" class="media-btn primary">Upload lydfil</button>
-                    <button type="button" id="btn-audio-cancel" class="media-btn">Annuller</button>
-                  </div>
-                </div>
               </div>
 
-              <div class="media-card media-card-image">
-                <div class="media-card-head">
-                  <div class="media-card-icon media-card-icon-image" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="m3 16 5-5 4 4 3-3 6 6"></path></svg>
-                  </div>
-                  <div>
-                    <p class="media-card-label">Billede</p>
-                    <p class="media-card-hint">JPEG · 16:9 · max 1200px bred</p>
-                  </div>
-                </div>
+              <div class="media-card media-card-image media-card-compact">
+                <p class="media-card-label media-card-label-inline">Billede <span class="media-card-hint">· 16:9 JPEG</span></p>
 
                 <div id="image-panel-idle" class="media-empty">
                   Vælg et punkt for at administrere billede.
@@ -200,12 +181,13 @@ $initialBoundary = readBoundaryData();
                   Gem punktet først — derefter kan du uploade billede.
                 </div>
 
-                <div id="image-panel-attached" class="media-attached hidden">
-                  <div class="media-image-preview-wrap">
-                    <img id="image-attached-preview" class="media-image-preview" alt="Aktivt punktbillede">
+                <div id="image-panel-attached" class="media-attached media-attached-compact hidden">
+                  <div class="media-image-preview-wrap media-image-preview-wrap-compact">
+                    <img id="image-attached-preview" class="media-image-preview media-image-preview-compact" alt="Aktivt punktbillede">
                   </div>
-                  <div class="media-attached-actions">
-                    <button type="button" id="btn-image-replace" class="media-text-btn">Udskift billede</button>
+                  <p id="image-attached-name" class="media-attached-name media-attached-name-compact media-image-attached-name"></p>
+                  <div class="media-attached-actions media-attached-actions-inline media-attached-actions-image">
+                    <button type="button" id="btn-image-replace" class="media-text-btn">Udskift</button>
                     <button type="button" id="btn-point-image-remove" class="media-text-btn danger">Fjern</button>
                   </div>
                 </div>
@@ -216,8 +198,10 @@ $initialBoundary = readBoundaryData();
                     <span class="media-dropzone-icon" aria-hidden="true">
                       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
                     </span>
-                    <span id="image-dropzone-title" class="media-dropzone-title">Vælg billede</span>
-                    <span id="image-dropzone-sub" class="media-dropzone-sub">Beskær og upload i ét trin</span>
+                    <span class="media-dropzone-copy">
+                      <span id="image-dropzone-title" class="media-dropzone-title">Vælg billede</span>
+                      <span id="image-dropzone-sub" class="media-dropzone-sub">Crop + upload</span>
+                    </span>
                   </button>
                   <button type="button" id="btn-image-replace-cancel" class="media-text-btn media-replace-cancel hidden">Behold nuværende billede</button>
                 </div>
@@ -227,21 +211,10 @@ $initialBoundary = readBoundaryData();
             <audio id="audio-preview" preload="none"></audio>
           </div>
 
-          <div class="editor-section">
-            <h3 class="editor-section-title">Placering</h3>
-            <div class="editor-fields editor-fields-coords">
-              <div>
-                <label for="point-lat" class="field-label">Breddegrad</label>
-                <input id="point-lat" type="number" step="any" required class="field-input field-input-mono">
-              </div>
-              <div>
-                <label for="point-lng" class="field-label">Længdegrad</label>
-                <input id="point-lng" type="number" step="any" required class="field-input field-input-mono">
-              </div>
-            </div>
-          </div>
-
-          <div class="editor-actions">
+          <div class="editor-actions editor-actions-sticky">
+            <p id="editor-unsaved-hint" class="editor-unsaved-hint hidden" role="status">
+              Du har ændringer, der ikke er gemt
+            </p>
             <button id="btn-save" type="submit" class="editor-btn editor-btn-primary" disabled>
               Gem ændringer
             </button>

@@ -91,7 +91,8 @@ function handleUpload(): void
 
   try {
     $entry = upsertRegistryEntryForPoint($pointId, $label !== '' ? $label : null);
-    $updatedPoint = setPointAudioSrc($pointId, $entry['url']);
+    $originalName = sanitizeOriginalFileName((string) ($upload['name'] ?? ''));
+    $updatedPoint = setPointAudioMedia($pointId, $entry['url'], $originalName);
   } catch (RuntimeException $e) {
     @unlink($targetPath);
     respond(false, null, $e->getMessage(), 500);
@@ -155,7 +156,7 @@ function handleDelete(array $input): void
   writeAudioRegistry($registry);
 
   try {
-    $updatedPoint = setPointAudioSrc($pointId, '');
+    $updatedPoint = clearPointAudioMedia($pointId);
   } catch (RuntimeException $e) {
     respond(false, null, $e->getMessage(), 500);
   }

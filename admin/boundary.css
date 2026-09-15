@@ -16,6 +16,22 @@
   flex-shrink: 0;
 }
 
+.toggle-row-nested {
+  margin-left: 1.4rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #57534e;
+}
+
+.toggle-row-nested.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toggle-row-nested.is-disabled input {
+  cursor: not-allowed;
+}
+
 .segment-list-item {
   width: 100%;
   text-align: left;
@@ -87,6 +103,29 @@
 
 .map-container.map-parcel-select .leaflet-interactive {
   cursor: pointer;
+}
+
+.matrikel-label {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #92400e;
+  border-radius: 0.25rem;
+  box-shadow: none;
+  color: #78350f;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 1px 4px;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.matrikel-label::before {
+  display: none;
+}
+
+.map-container.matrikel-labels-hidden .matrikel-label {
+  display: none !important;
 }
 
 .parcel-import-actions {

@@ -39,6 +39,7 @@ $initialPoints = readPointsData();
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <a href="index.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Lydpunkter</a>
+        <a href="stats.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Statistik</a>
         <span id="status-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full"></span>
         <a href="logout.php" class="text-sm font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">Log ud</a>
       </div>
@@ -79,6 +80,10 @@ $initialPoints = readPointsData();
             <label class="toggle-row">
               <input id="toggle-matrikel" type="checkbox">
               <span>Matrikelkort (jordstykker)</span>
+            </label>
+            <label id="toggle-matrikel-labels-row" class="toggle-row toggle-row-nested">
+              <input id="toggle-matrikel-labels" type="checkbox">
+              <span>Vis matrikelnavne</span>
             </label>
             <label class="toggle-row">
               <input id="toggle-parcel-select" type="checkbox">

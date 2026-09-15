@@ -62,6 +62,7 @@ const state = {
   baseLayers: {},
   matrikelGroup: null,
   matrikelEnabled: false,
+  matrikelLabelsEnabled: false,
   matrikelFetchTimer: null,
   matrikelRequestId: 0,
   selectedParcelLayers: new Set(),
@@ -86,6 +87,8 @@ const els = {
   statusBadge: document.getElementById('status-badge'),
   loadError: document.getElementById('load-error'),
   toggleMatrikel: document.getElementById('toggle-matrikel'),
+  toggleMatrikelLabels: document.getElementById('toggle-matrikel-labels'),
+  toggleMatrikelLabelsRow: document.getElementById('toggle-matrikel-labels-row'),
   toggleParcelSelect: document.getElementById('toggle-parcel-select'),
   parcelSelectionInfo: document.getElementById('parcel-selection-info'),
   importParcels: document.getElementById('btn-import-parcels'),
@@ -425,6 +428,22 @@ function ensureMatrikelGroup() {
   return state.matrikelGroup;
 }
 
+function getMatrikelLabel(feature) {
+  const props = feature?.properties || {};
+  const matrikelnr = String(
+    props.matrikelnr || props.matrikelnummer || '',
+  ).trim();
+  const ejerlavnavn = String(
+    props.ejerlavnavn || props.ejerlav?.navn || '',
+  ).trim();
+
+  if (matrikelnr && ejerlavnavn) {
+    return `${matrikelnr}, ${ejerlavnavn}`;
+  }
+
+  return matrikelnr || ejerlavnavn || '';
+}
+
 function bindMatrikelFeature(feature, layer) {
   layer._jordstykkeFeature = feature;
   layer.options.pmIgnore = true;
@@ -454,6 +473,17 @@ function bindMatrikelFeature(feature, layer) {
   });
 
   updateParcelLayerStyle(layer);
+
+  const label = getMatrikelLabel(feature);
+  if (label) {
+    layer.bindTooltip(label, {
+      permanent: true,
+      direction: 'center',
+      className: 'matrikel-label',
+      opacity: 1,
+      interactive: false,
+    });
+  }
 }
 
 function attachMatrikelSnapTargets(pmInstance) {
@@ -639,6 +669,37 @@ function scheduleMatrikelRefresh() {
 }
 
 
+function updateMatrikelLabelsUI() {
+  const canShowLabels = state.matrikelEnabled;
+
+  if (els.toggleMatrikelLabels) {
+    els.toggleMatrikelLabels.disabled = !canShowLabels;
+    if (!canShowLabels) {
+      els.toggleMatrikelLabels.checked = false;
+      state.matrikelLabelsEnabled = false;
+    }
+  }
+
+  if (els.toggleMatrikelLabelsRow) {
+    els.toggleMatrikelLabelsRow.classList.toggle('is-disabled', !canShowLabels);
+  }
+
+  if (els.map) {
+    els.map.classList.toggle(
+      'matrikel-labels-hidden',
+      !state.matrikelEnabled || !state.matrikelLabelsEnabled,
+    );
+  }
+}
+
+function setMatrikelLabelsEnabled(enabled) {
+  state.matrikelLabelsEnabled = Boolean(enabled) && state.matrikelEnabled;
+  if (els.toggleMatrikelLabels) {
+    els.toggleMatrikelLabels.checked = state.matrikelLabelsEnabled;
+  }
+  updateMatrikelLabelsUI();
+}
+
 function toggleMatrikel(checked) {
   state.matrikelEnabled = checked;
 
@@ -659,6 +720,8 @@ function toggleMatrikel(checked) {
     }
     els.matrikelHint.classList.add('hidden');
   }
+
+  updateMatrikelLabelsUI();
 }
 
 function geoJsonToSegments(geometry) {
@@ -876,6 +939,12 @@ els.toggleMatrikel.addEventListener('change', (event) => {
   toggleMatrikel(event.target.checked);
 });
 
+if (els.toggleMatrikelLabels) {
+  els.toggleMatrikelLabels.addEventListener('change', (event) => {
+    setMatrikelLabelsEnabled(event.target.checked);
+  });
+}
+
 if (els.toggleParcelSelect) {
   els.toggleParcelSelect.addEventListener('change', (event) => {
     setParcelSelectMode(event.target.checked);
@@ -900,6 +969,7 @@ els.togglePoints.addEventListener('change', () => {
 
 try {
   initMap();
+  updateMatrikelLabelsUI();
   loadInitialData();
 } catch (error) {
   showLoadError(error.message);

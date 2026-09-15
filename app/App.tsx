@@ -6,6 +6,7 @@ import InfoPanel from './components/InfoPanel';
 import IntroModal from './components/IntroModal';
 import SplashScreen from './components/SplashScreen';
 import { loadGuideData } from './services/guideData';
+import { trackVisit, trackLocation } from './services/analytics';
 import { AudioPoint, Category, PolygonCoords } from './types';
 
 const App: React.FC = () => {
@@ -39,6 +40,25 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchGuideData();
   }, [fetchGuideData]);
+
+  useEffect(() => {
+    if (!isLoadingData && !loadError) {
+      trackVisit();
+    }
+  }, [isLoadingData, loadError]);
+
+  useEffect(() => {
+    if (!userLocation || audioPoints.length === 0) {
+      return;
+    }
+
+    trackLocation(userLocation, audioPoints.map((point) => ({
+      id: point.id,
+      lat: point.lat,
+      lng: point.lng,
+      title: point.title,
+    })));
+  }, [userLocation, audioPoints]);
 
   useEffect(() => {
     const checkDevice = () => {
@@ -81,10 +101,10 @@ const App: React.FC = () => {
 
   if (isDesktop) {
     return (
-      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-emerald-950">
-        <div className="absolute inset-0 z-0">
-          <img src={wildNatureImgUrl} className="w-full h-full object-cover opacity-30 blur-sm" alt="" />
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/80 to-emerald-950"></div>
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <img src={wildNatureImgUrl} className="w-full h-full object-cover" alt="" />
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/45 via-emerald-950/30 to-emerald-950/55"></div>
         </div>
 
         <div className="relative z-10 w-full max-w-lg p-10 bg-white rounded-[3rem] shadow-2xl text-center mx-4">

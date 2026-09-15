@@ -23,7 +23,12 @@ const state = {
   statusTimer: null,
   currentAudioSrc: '',
   currentImageSrc: '',
+  currentAudioFileName: '',
+  currentImageFileName: '',
+  pendingImageOriginalName: '',
   isUploadingImage: false,
+  isUploadingAudio: false,
+  editorBaseline: null,
 };
 
 const els = {
@@ -44,13 +49,9 @@ const els = {
   audioLocked: document.getElementById('audio-panel-locked'),
   audioAttached: document.getElementById('audio-panel-attached'),
   audioUpload: document.getElementById('audio-panel-upload'),
-  audioPending: document.getElementById('audio-panel-pending'),
   audioAttachedName: document.getElementById('audio-attached-name'),
-  audioPendingName: document.getElementById('audio-pending-name'),
   audioFile: document.getElementById('point-audio-file'),
   audioPick: document.getElementById('btn-audio-pick'),
-  audioUploadBtn: document.getElementById('btn-point-audio-upload'),
-  audioCancel: document.getElementById('btn-audio-cancel'),
   audioReplace: document.getElementById('btn-audio-replace'),
   audioReplaceCancel: document.getElementById('btn-audio-replace-cancel'),
   audioDropzoneTitle: document.getElementById('audio-dropzone-title'),
@@ -63,6 +64,7 @@ const els = {
   imageAttached: document.getElementById('image-panel-attached'),
   imageUpload: document.getElementById('image-panel-upload'),
   imageAttachedPreview: document.getElementById('image-attached-preview'),
+  imageAttachedName: document.getElementById('image-attached-name'),
   imageFile: document.getElementById('point-image-file'),
   imagePick: document.getElementById('btn-image-pick'),
   imageReplace: document.getElementById('btn-image-replace'),
@@ -75,6 +77,8 @@ const els = {
   save: document.getElementById('btn-save'),
   delete: document.getElementById('btn-delete'),
   newBtn: document.getElementById('btn-new'),
+  editorActions: document.querySelector('.editor-actions-sticky'),
+  unsavedHint: document.getElementById('editor-unsaved-hint'),
 };
 
 async function api(path, options = {}) {
@@ -290,9 +294,11 @@ function renderMarkers() {
   });
 
   state.points.forEach((point) => {
+    const isActive = point.id === state.selectedId;
     const marker = L.marker([point.lat, point.lng], {
       draggable: true,
-      icon: createMarkerIcon(point, point.id === state.selectedId),
+      icon: createMarkerIcon(point, isActive),
+      zIndexOffset: isActive ? 1000 : 0,
     });
 
     marker.on('click', () => selectPoint(point.id));
@@ -317,10 +323,18 @@ function audioFilenameFromSrc(src) {
     return '';
   }
   try {
-    return decodeURIComponent(src.split('/').pop() || '');
+    const pathPart = src.split('?')[0].split('/').pop() || '';
+    return decodeURIComponent(pathPart);
   } catch (error) {
-    return src.split('/').pop() || '';
+    return src.split('?')[0].split('/').pop() || '';
   }
+}
+
+function getMediaDisplayFileName(storedName, src) {
+  if (storedName) {
+    return storedName;
+  }
+  return audioFilenameFromSrc(src);
 }
 
 function setPanelVisible(panel, visible) {
@@ -328,6 +342,99 @@ function setPanelVisible(panel, visible) {
     return;
   }
   panel.classList.toggle('hidden', !visible);
+}
+
+function openFilePicker(input, { beforeOpen, onSelected, onCancel } = {}) {
+  if (!input) {
+    onCancel?.();
+    return;
+  }
+
+  beforeOpen?.();
+  input.value = '';
+
+  let selected = false;
+
+  const handleChange = () => {
+    if (!input.files?.length) {
+      return;
+    }
+    selected = true;
+    onSelected?.(input.files[0]);
+  };
+
+  input.addEventListener('change', handleChange, { once: true });
+
+  const handleWindowFocus = () => {
+    window.removeEventListener('focus', handleWindowFocus);
+    setTimeout(() => {
+      if (!selected && !input.files?.length) {
+        onCancel?.();
+      }
+    }, 400);
+  };
+
+  window.addEventListener('focus', handleWindowFocus);
+  input.click();
+}
+
+function setImagePreviewSrc(src) {
+  if (!els.imageAttachedPreview) {
+    return;
+  }
+
+  if (!src) {
+    els.imageAttachedPreview.removeAttribute('data-preview-src');
+    els.imageAttachedPreview.removeAttribute('src');
+    return;
+  }
+
+  if (els.imageAttachedPreview.dataset.previewSrc === src) {
+    return;
+  }
+
+  els.imageAttachedPreview.dataset.previewSrc = src;
+  els.imageAttachedPreview.src = src;
+}
+
+function clearImagePreviewSrc() {
+  if (!els.imageAttachedPreview) {
+    return;
+  }
+
+  els.imageAttachedPreview.removeAttribute('data-preview-src');
+  els.imageAttachedPreview.removeAttribute('src');
+}
+
+function setAudioPreviewSrc(src) {
+  if (!els.audioPreview) {
+    return;
+  }
+
+  if (!src) {
+    clearAudioPreviewSrc();
+    return;
+  }
+
+  if (els.audioPreview.dataset.previewSrc === src) {
+    return;
+  }
+
+  stopAudioPreview();
+  els.audioPreview.dataset.previewSrc = src;
+  els.audioPreview.src = src;
+  els.audioPreview.load();
+}
+
+function clearAudioPreviewSrc() {
+  if (!els.audioPreview) {
+    return;
+  }
+
+  stopAudioPreview();
+  els.audioPreview.removeAttribute('data-preview-src');
+  els.audioPreview.removeAttribute('src');
+  els.audioPreview.load();
 }
 
 function clearPendingImageSelection() {
@@ -352,8 +459,19 @@ function updatePointImageUI() {
     hasSelection && (!imageSrc || state.isReplacingImage || state.isUploadingImage),
   );
 
-  if (hasSelection && imageSrc && els.imageAttachedPreview) {
-    els.imageAttachedPreview.src = imageSrc;
+  if (hasSelection && imageSrc) {
+    setImagePreviewSrc(imageSrc);
+    if (els.imageAttachedName) {
+      els.imageAttachedName.textContent = getMediaDisplayFileName(
+        state.currentImageFileName,
+        imageSrc,
+      );
+    }
+  } else {
+    clearImagePreviewSrc();
+    if (els.imageAttachedName) {
+      els.imageAttachedName.textContent = '';
+    }
   }
 
   if (els.imageDropzoneTitle) {
@@ -397,6 +515,7 @@ async function uploadPointImage(blob) {
   const formData = new FormData();
   formData.append('file', blob, `point-${state.selectedId}.jpg`);
   formData.append('pointId', String(state.selectedId));
+  formData.append('originalFileName', state.pendingImageOriginalName || '');
 
   state.isUploadingImage = true;
   updatePointImageUI();
@@ -422,10 +541,15 @@ async function uploadPointImage(blob) {
         point.id === updatedPoint.id ? updatedPoint : point
       ));
       state.currentImageSrc = updatedPoint.imageSrc || payload.data.imageSrc || '';
+      state.currentImageFileName = updatedPoint.imageFileName || '';
     } else {
       state.currentImageSrc = payload.data.imageSrc || '';
+      state.currentImageFileName = payload.data.imageFileName || '';
     }
 
+    state.pendingImageOriginalName = '';
+
+    clearImagePreviewSrc();
     clearPendingImageSelection();
     updatePointImageUI();
     showStatus('Billede uploadet til punktet.');
@@ -464,8 +588,10 @@ async function removePointImage() {
         point.id === updatedPoint.id ? updatedPoint : point
       ));
       state.currentImageSrc = updatedPoint.imageSrc || '';
+      state.currentImageFileName = updatedPoint.imageFileName || '';
     } else {
       state.currentImageSrc = '';
+      state.currentImageFileName = '';
     }
 
     clearPendingImageSelection();
@@ -481,6 +607,8 @@ async function handleImageFileSelected(file) {
     updatePointImageUI();
     return;
   }
+
+  state.pendingImageOriginalName = file.name || '';
 
   if (!window.ImageCropper) {
     showStatus('Billede-cropper kunne ikke indlæses.', 'error');
@@ -505,29 +633,32 @@ if (els.imageRemove) {
 
 if (els.imagePick) {
   els.imagePick.addEventListener('click', () => {
-    els.imageFile?.click();
-  });
-}
-
-if (els.imageFile) {
-  els.imageFile.addEventListener('change', () => {
-    const file = els.imageFile.files?.[0];
-    if (!file) {
-      updatePointImageUI();
+    if (state.isUploadingImage) {
       return;
     }
-    handleImageFileSelected(file);
+    openFilePicker(els.imageFile, {
+      onSelected: (file) => handleImageFileSelected(file),
+      onCancel: () => updatePointImageUI(),
+    });
   });
 }
 
 if (els.imageReplace) {
   els.imageReplace.addEventListener('click', () => {
-    state.isReplacingImage = true;
-    if (els.imageFile) {
-      els.imageFile.value = '';
+    if (state.isUploadingImage) {
+      return;
     }
-    updatePointImageUI();
-    els.imageFile?.click();
+    openFilePicker(els.imageFile, {
+      beforeOpen: () => {
+        state.isReplacingImage = true;
+        updatePointImageUI();
+      },
+      onSelected: (file) => handleImageFileSelected(file),
+      onCancel: () => {
+        clearPendingImageSelection();
+        updatePointImageUI();
+      },
+    });
   });
 }
 
@@ -562,7 +693,6 @@ function updateEditorBadge() {
 function updatePointAudioUI() {
   const hasSelection = state.selectedId && state.selectedId !== 'new';
   const audioSrc = state.currentAudioSrc || '';
-  const hasPendingFile = Boolean(els.audioFile?.files?.length);
 
   if (els.audioSrc) {
     els.audioSrc.value = audioSrc;
@@ -570,30 +700,47 @@ function updatePointAudioUI() {
 
   setPanelVisible(els.audioIdle, !state.selectedId);
   setPanelVisible(els.audioLocked, state.isNew);
-  setPanelVisible(els.audioAttached, hasSelection && Boolean(audioSrc) && !hasPendingFile && !state.isReplacingAudio);
-  setPanelVisible(els.audioUpload, hasSelection && (!audioSrc || state.isReplacingAudio) && !hasPendingFile);
-  setPanelVisible(els.audioPending, hasSelection && hasPendingFile);
+  setPanelVisible(
+    els.audioAttached,
+    hasSelection && Boolean(audioSrc) && !state.isReplacingAudio && !state.isUploadingAudio,
+  );
+  setPanelVisible(
+    els.audioUpload,
+    hasSelection && (!audioSrc || state.isReplacingAudio || state.isUploadingAudio),
+  );
 
   if (hasSelection && audioSrc && els.audioAttachedName) {
-    els.audioAttachedName.textContent = audioFilenameFromSrc(audioSrc);
-  }
-
-  if (hasPendingFile && els.audioPendingName && els.audioFile?.files?.[0]) {
-    els.audioPendingName.textContent = els.audioFile.files[0].name;
+    els.audioAttachedName.textContent = getMediaDisplayFileName(
+      state.currentAudioFileName,
+      audioSrc,
+    );
   }
 
   if (els.audioDropzoneTitle) {
-    els.audioDropzoneTitle.textContent = state.isReplacingAudio ? 'Vælg ny lydfil' : 'Vælg lydfil';
+    if (state.isUploadingAudio) {
+      els.audioDropzoneTitle.textContent = 'Uploader lydfil…';
+    } else {
+      els.audioDropzoneTitle.textContent = state.isReplacingAudio ? 'Vælg ny lydfil' : 'Vælg lydfil';
+    }
   }
   if (els.audioDropzoneSub) {
-    els.audioDropzoneSub.textContent = state.isReplacingAudio
-      ? 'Erstatter den nuværende MP3'
-      : 'Klik for at vælge MP3';
+    els.audioDropzoneSub.textContent = state.isUploadingAudio
+      ? 'Vent et øjeblik'
+      : state.isReplacingAudio
+        ? 'Erstatter den nuværende MP3'
+        : 'Klik for at vælge MP3';
   }
   setPanelVisible(
     els.audioReplaceCancel,
-    hasSelection && state.isReplacingAudio && !hasPendingFile && Boolean(audioSrc),
+    hasSelection && state.isReplacingAudio && !state.isUploadingAudio && Boolean(audioSrc),
   );
+
+  if (els.audioPick) {
+    els.audioPick.disabled = state.isUploadingAudio;
+  }
+  if (els.audioReplace) {
+    els.audioReplace.disabled = state.isUploadingAudio;
+  }
 
   updateEditorBadge();
   updateAudioPlayButton();
@@ -602,22 +749,28 @@ function updatePointAudioUI() {
 async function uploadPointAudio() {
   if (state.isNew || !state.selectedId) {
     showStatus('Gem punktet først — derefter kan du uploade lydfil.', 'error');
-    return;
+    return false;
+  }
+
+  if (state.isUploadingAudio) {
+    return false;
   }
 
   if (!els.audioFile?.files?.length) {
     showStatus('Vælg en MP3-fil først.', 'error');
-    return;
+    return false;
   }
 
   const formData = new FormData();
   formData.append('file', els.audioFile.files[0]);
   formData.append('pointId', String(state.selectedId));
+  formData.append('originalFileName', els.audioFile.files[0].name || '');
   if (els.title?.value.trim()) {
     formData.append('label', els.title.value.trim());
   }
 
-  els.audioUploadBtn.disabled = true;
+  state.isUploadingAudio = true;
+  updatePointAudioUI();
 
   try {
     const response = await fetch(`${API_BASE}/audio-upload.php`, {
@@ -640,19 +793,25 @@ async function uploadPointAudio() {
         point.id === updatedPoint.id ? updatedPoint : point
       ));
       state.currentAudioSrc = updatedPoint.audioSrc || payload.data.audioSrc || '';
+      state.currentAudioFileName = updatedPoint.audioFileName || '';
     } else {
       state.currentAudioSrc = payload.data.audioSrc || '';
+      state.currentAudioFileName = payload.data.audioFileName || '';
     }
 
+    clearAudioPreviewSrc();
     els.audioFile.value = '';
     clearPendingAudioSelection();
     updatePointAudioUI();
     renderMarkers();
     showStatus('Lydfil uploadet til punktet.');
+    return true;
   } catch (error) {
     showStatus(error.message, 'error');
+    return false;
   } finally {
-    els.audioUploadBtn.disabled = false;
+    state.isUploadingAudio = false;
+    updatePointAudioUI();
   }
 }
 
@@ -681,11 +840,14 @@ async function removePointAudio() {
         point.id === updatedPoint.id ? updatedPoint : point
       ));
       state.currentAudioSrc = updatedPoint.audioSrc || '';
+      state.currentAudioFileName = updatedPoint.audioFileName || '';
     } else {
       state.currentAudioSrc = '';
+      state.currentAudioFileName = '';
     }
 
     stopAudioPreview();
+    clearAudioPreviewSrc();
     clearPendingAudioSelection();
     updatePointAudioUI();
     renderMarkers();
@@ -709,6 +871,8 @@ function setAudioPlayState(isPlaying) {
     return;
   }
   els.audioPlay.classList.toggle('is-playing', isPlaying);
+  els.audioPlay.title = isPlaying ? 'Pause' : 'Afspil';
+  els.audioPlay.setAttribute('aria-label', isPlaying ? 'Pause lydfil' : 'Afspil lydfil');
 }
 
 function updateAudioPlayButton() {
@@ -737,9 +901,7 @@ function toggleAudioPreview() {
     return;
   }
 
-  if (els.audioPreview.src !== src) {
-    els.audioPreview.src = src;
-  }
+  setAudioPreviewSrc(src);
 
   els.audioPreview.play()
     .then(() => setAudioPlayState(true))
@@ -754,45 +916,38 @@ if (els.audioPlay) {
   els.audioPlay.addEventListener('click', toggleAudioPreview);
 }
 
-if (els.audioUploadBtn) {
-  els.audioUploadBtn.addEventListener('click', uploadPointAudio);
-}
-
 if (els.audioRemove) {
   els.audioRemove.addEventListener('click', removePointAudio);
 }
 
 if (els.audioPick) {
   els.audioPick.addEventListener('click', () => {
-    els.audioFile?.click();
-  });
-}
-
-if (els.audioFile) {
-  els.audioFile.addEventListener('change', () => {
-    if (!els.audioFile.files?.length) {
-      updatePointAudioUI();
+    if (state.isUploadingAudio) {
       return;
     }
-    updatePointAudioUI();
-  });
-}
-
-if (els.audioCancel) {
-  els.audioCancel.addEventListener('click', () => {
-    clearPendingAudioSelection();
-    updatePointAudioUI();
+    openFilePicker(els.audioFile, {
+      onSelected: () => uploadPointAudio(),
+      onCancel: () => updatePointAudioUI(),
+    });
   });
 }
 
 if (els.audioReplace) {
   els.audioReplace.addEventListener('click', () => {
-    state.isReplacingAudio = true;
-    if (els.audioFile) {
-      els.audioFile.value = '';
+    if (state.isUploadingAudio) {
+      return;
     }
-    updatePointAudioUI();
-    els.audioFile?.click();
+    openFilePicker(els.audioFile, {
+      beforeOpen: () => {
+        state.isReplacingAudio = true;
+        updatePointAudioUI();
+      },
+      onSelected: () => uploadPointAudio(),
+      onCancel: () => {
+        clearPendingAudioSelection();
+        updatePointAudioUI();
+      },
+    });
   });
 }
 
@@ -806,6 +961,75 @@ if (els.audioReplaceCancel) {
 function setEditorEnabled(enabled) {
   els.save.disabled = !enabled;
   els.delete.disabled = !enabled || state.isNew;
+  updateEditorDirtyState();
+}
+
+function normalizeCoord(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Number(number.toFixed(8)) : null;
+}
+
+function getEditorFieldSnapshot() {
+  return {
+    title: els.title.value.trim(),
+    description: els.description.value.trim(),
+    category: els.category.value,
+    lat: normalizeCoord(els.lat.value),
+    lng: normalizeCoord(els.lng.value),
+  };
+}
+
+function captureEditorBaseline() {
+  if (!state.selectedId) {
+    state.editorBaseline = null;
+    return;
+  }
+  state.editorBaseline = getEditorFieldSnapshot();
+}
+
+function isEditorDirty() {
+  if (!state.selectedId || !state.editorBaseline) {
+    return false;
+  }
+
+  const current = getEditorFieldSnapshot();
+  const baseline = state.editorBaseline;
+
+  return (
+    current.title !== baseline.title
+    || current.description !== baseline.description
+    || current.category !== baseline.category
+    || current.lat !== baseline.lat
+    || current.lng !== baseline.lng
+  );
+}
+
+function updateEditorDirtyState() {
+  const dirty = isEditorDirty();
+
+  if (els.save) {
+    const showDirty = dirty && !els.save.disabled;
+    els.save.classList.toggle('editor-btn-primary--dirty', showDirty);
+    els.save.textContent = showDirty ? 'Gem ændringer · ikke gemt' : 'Gem ændringer';
+  }
+
+  if (els.editorActions) {
+    els.editorActions.classList.toggle('editor-actions-dirty', dirty);
+  }
+
+  if (els.unsavedHint) {
+    els.unsavedHint.classList.toggle('hidden', !dirty);
+  }
+}
+
+function confirmDiscardUnsavedChanges(message) {
+  if (!isEditorDirty()) {
+    return true;
+  }
+
+  return window.confirm(
+    message || 'Du har ændringer, der ikke er gemt.\n\nVil du fortsætte uden at gemme? Dine ændringer går tabt.',
+  );
 }
 
 function clearForm() {
@@ -815,11 +1039,16 @@ function clearForm() {
   }
 
   stopAudioPreview();
+  clearAudioPreviewSrc();
   clearPendingImageSelection();
   state.selectedId = null;
   state.isNew = false;
+  state.editorBaseline = null;
   state.currentAudioSrc = '';
   state.currentImageSrc = '';
+  state.currentAudioFileName = '';
+  state.currentImageFileName = '';
+  state.pendingImageOriginalName = '';
   state.isReplacingAudio = false;
   els.id.value = '';
   els.title.value = '';
@@ -835,10 +1064,12 @@ function clearForm() {
   updatePointAudioUI();
   updatePointImageUI();
   renderMarkers();
+  updateEditorDirtyState();
 }
 
 function fillForm(point) {
   stopAudioPreview();
+  clearAudioPreviewSrc();
   clearPendingAudioSelection();
   clearPendingImageSelection();
   state.selectedId = point.id;
@@ -850,6 +1081,9 @@ function fillForm(point) {
   els.category.value = point.category;
   state.currentAudioSrc = point.audioSrc || '';
   state.currentImageSrc = point.imageSrc || '';
+  state.currentAudioFileName = point.audioFileName || '';
+  state.currentImageFileName = point.imageFileName || '';
+  state.pendingImageOriginalName = '';
   els.lat.value = point.lat;
   els.lng.value = point.lng;
   els.subtitle.textContent = `Redigerer punkt #${point.id}`;
@@ -857,12 +1091,22 @@ function fillForm(point) {
     els.audioFile.value = '';
   }
   setEditorEnabled(true);
+  captureEditorBaseline();
   updatePointAudioUI();
   updatePointImageUI();
   renderMarkers();
+  updateEditorDirtyState();
 }
 
-function selectPoint(id) {
+function selectPoint(id, options = {}) {
+  if (id === state.selectedId && !state.isNew && !options.force) {
+    return;
+  }
+
+  if (!options.force && !confirmDiscardUnsavedChanges()) {
+    return;
+  }
+
   const point = state.points.find((item) => item.id === id);
   if (!point) {
     return;
@@ -873,6 +1117,7 @@ function selectPoint(id) {
 function updateFormCoords(lat, lng) {
   els.lat.value = Number(lat).toFixed(8);
   els.lng.value = Number(lng).toFixed(8);
+  updateEditorDirtyState();
 }
 
 function getFormData() {
@@ -948,6 +1193,10 @@ async function loadInitialData() {
 }
 
 els.newBtn.addEventListener('click', () => {
+  if (!confirmDiscardUnsavedChanges('Du har ændringer, der ikke er gemt.\n\nVil du oprette et nyt punkt uden at gemme? Dine ændringer går tabt.')) {
+    return;
+  }
+
   stopAudioPreview();
   clearPendingImageSelection();
 
@@ -970,6 +1219,9 @@ els.newBtn.addEventListener('click', () => {
   els.category.value = 'Historie';
   state.currentAudioSrc = '';
   state.currentImageSrc = '';
+  state.currentAudioFileName = '';
+  state.currentImageFileName = '';
+  state.pendingImageOriginalName = '';
   updateFormCoords(center.lat, center.lng);
   els.subtitle.textContent = 'Nyt punkt — udfyld felter og gem';
   state.isReplacingAudio = false;
@@ -977,6 +1229,7 @@ els.newBtn.addEventListener('click', () => {
     els.audioFile.value = '';
   }
   setEditorEnabled(true);
+  captureEditorBaseline();
   updatePointAudioUI();
   updatePointImageUI();
   renderPointList();
@@ -992,6 +1245,7 @@ els.newBtn.addEventListener('click', () => {
   const marker = L.marker([center.lat, center.lng], {
     draggable: true,
     icon: createMarkerIcon(draftPoint, true),
+    zIndexOffset: 1000,
   });
 
   marker.on('dragend', () => {
@@ -1001,6 +1255,19 @@ els.newBtn.addEventListener('click', () => {
 
   marker.addTo(state.map);
   state.markers.new = marker;
+  updateEditorDirtyState();
+});
+
+els.form.addEventListener('input', updateEditorDirtyState);
+els.form.addEventListener('change', updateEditorDirtyState);
+
+window.addEventListener('beforeunload', (event) => {
+  if (!isEditorDirty()) {
+    return;
+  }
+
+  event.preventDefault();
+  event.returnValue = '';
 });
 
 els.form.addEventListener('submit', async (event) => {
@@ -1046,10 +1313,11 @@ els.form.addEventListener('submit', async (event) => {
 
     renderMarkers();
     if (state.selectedId) {
-      selectPoint(state.selectedId);
+      selectPoint(state.selectedId, { force: true });
     } else {
       updatePointAudioUI();
       updatePointImageUI();
+      updateEditorDirtyState();
     }
   } catch (error) {
     showStatus(error.message, 'error');

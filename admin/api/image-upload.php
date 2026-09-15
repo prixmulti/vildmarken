@@ -84,9 +84,13 @@ function handleUpload(): void
   }
 
   $url = imageFileUrl($filename);
+  $originalName = sanitizeOriginalFileName((string) ($_POST['originalFileName'] ?? ''));
+  if ($originalName === '') {
+    $originalName = sanitizeOriginalFileName((string) ($upload['name'] ?? ''));
+  }
 
   try {
-    $updatedPoint = setPointImageSrc($pointId, $url);
+    $updatedPoint = setPointImageMedia($pointId, $url, $originalName);
   } catch (RuntimeException $e) {
     @unlink($targetPath);
     respond(false, null, $e->getMessage(), 500);
@@ -123,7 +127,7 @@ function handleDelete(array $input): void
   }
 
   try {
-    $updatedPoint = setPointImageSrc($pointId, '');
+    $updatedPoint = clearPointImageMedia($pointId);
   } catch (RuntimeException $e) {
     respond(false, null, $e->getMessage(), 500);
   }

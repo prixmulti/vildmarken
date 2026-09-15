@@ -12,6 +12,8 @@ define('IMAGE_BASE_URL', 'https://naturaudio.dk/vildmarken/images');
 define('IMAGE_MAX_BYTES', 3 * 1024 * 1024);
 define('IMAGE_MAX_WIDTH', 1200);
 define('BOUNDARY_FILE', VILDMARKEN_ROOT . '/data/boundary.json');
+define('ANALYTICS_DIR', VILDMARKEN_ROOT . '/data/analytics');
+define('ANALYTICS_RETENTION_DAYS', 90);
 
 $localConfig = __DIR__ . '/config.local.php';
 if (file_exists($localConfig)) {

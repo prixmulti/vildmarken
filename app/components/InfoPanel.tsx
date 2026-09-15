@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Play, Pause, MapPin } from 'lucide-react';
 import { AudioPoint } from '../types';
+import { trackListen, ListenEventType } from '../services/analytics';
 
 interface InfoPanelProps {
   point: AudioPoint | null;
@@ -25,15 +26,64 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pointIdRef = useRef<number | null>(null);
+  const lastAudioTimeRef = useRef(0);
+  const pendingSecondsRef = useRef(0);
+  const isPlayingRef = useRef(false);
 
   const hasAudio = Boolean(point?.audioSrc);
   const hasImage = Boolean(point?.imageSrc);
 
-  useEffect(() => {
-    if (!point || !hasAudio) {
-      if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+  const flushListen = useCallback((event: ListenEventType, targetPointId?: number | null) => {
+    const pointId = targetPointId ?? pointIdRef.current;
+    if (!pointId || pendingSecondsRef.current < 1) {
+      pendingSecondsRef.current = 0;
       return;
     }
+
+    trackListen(pointId, pendingSecondsRef.current, event);
+    pendingSecondsRef.current = 0;
+  }, []);
+
+  const accumulateListenTime = useCallback(() => {
+    if (!audioRef.current || !isPlayingRef.current || !pointIdRef.current) {
+      return;
+    }
+
+    const current = audioRef.current.currentTime;
+    const delta = current - lastAudioTimeRef.current;
+    if (delta > 0 && delta < 5) {
+      pendingSecondsRef.current += delta;
+    }
+    lastAudioTimeRef.current = current;
+  }, []);
+
+  useEffect(() => {
+    const previousPointId = pointIdRef.current;
+
+    if (!point || !hasAudio) {
+      if (previousPointId) {
+        accumulateListenTime();
+        flushListen('switch', previousPointId);
+      }
+      pointIdRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    if (previousPointId && previousPointId !== point.id) {
+      accumulateListenTime();
+      flushListen('switch', previousPointId);
+    }
+
+    pointIdRef.current = point.id;
+    pendingSecondsRef.current = 0;
+    lastAudioTimeRef.current = 0;
+    isPlayingRef.current = false;
+
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = point.audioSrc;
@@ -42,7 +92,35 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
       setProgress(0);
       setCurrentTime(0);
     }
-  }, [point, hasAudio]);
+
+    return () => {
+      if (pointIdRef.current === point.id) {
+        accumulateListenTime();
+        flushListen('switch', point.id);
+      }
+    };
+  }, [point, hasAudio, accumulateListenTime, flushListen]);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      accumulateListenTime();
+      flushListen('hidden');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handlePageHide();
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [accumulateListenTime, flushListen]);
 
   const togglePlay = () => {
     if (!audioRef.current || !hasAudio) return;
@@ -51,8 +129,29 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
     setIsPlaying(!isPlaying);
   };
 
+  const onPlay = () => {
+    isPlayingRef.current = true;
+    lastAudioTimeRef.current = audioRef.current?.currentTime ?? 0;
+    setIsPlaying(true);
+  };
+
+  const onPause = () => {
+    accumulateListenTime();
+    flushListen('pause');
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+  };
+
+  const onEnded = () => {
+    accumulateListenTime();
+    flushListen('ended');
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+  };
+
   const onTimeUpdate = () => {
     if (!audioRef.current) return;
+    accumulateListenTime();
     const cur = audioRef.current.currentTime;
     const dur = audioRef.current.duration;
     setCurrentTime(cur);
@@ -66,6 +165,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleClose = () => {
+    accumulateListenTime();
+    flushListen('close');
+    onClose();
+  };
+
   if (!point) return null;
 
   const distance = userLocation && point
@@ -73,15 +178,14 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
     : null;
 
   return (
-    <div
-      className={`fixed bottom-4 left-4 right-4 z-[2000] bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-all duration-500 ease-out transform flex flex-col overflow-hidden ${point ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
-      style={{ maxHeight: '85vh' }}
-    >
+    <div className="info-panel fixed left-4 right-4 z-[2000] bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-all duration-500 ease-out flex flex-col overflow-hidden">
       {!hasAudio ? null : (
         <audio
           ref={audioRef}
+          onPlay={onPlay}
+          onPause={onPause}
           onTimeUpdate={onTimeUpdate}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={onEnded}
           onLoadedMetadata={onTimeUpdate}
         />
       )}
@@ -94,7 +198,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
             className="aspect-video w-full object-cover"
           />
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute top-3 right-3 p-2 rounded-full bg-white/95 text-stone-700 shadow-md shrink-0"
             aria-label="Luk"
           >
@@ -102,7 +206,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
           </button>
         </div>
       ) : (
-        <div className="flex justify-center p-3 cursor-pointer shrink-0" onClick={onClose}>
+        <div className="flex justify-center p-3 cursor-pointer shrink-0" onClick={handleClose}>
           <div className="w-10 h-1 bg-stone-200 rounded-full" />
         </div>
       )}
@@ -117,7 +221,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
             <div className="flex-1 pr-4">
               <h2 className="text-xl font-black text-[#1a3a32] leading-tight">{point.title}</h2>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full bg-stone-100 text-stone-600 shrink-0">
+            <button onClick={handleClose} className="p-2 rounded-full bg-stone-100 text-stone-600 shrink-0">
               <X size={18} />
             </button>
           </div>
@@ -155,22 +259,22 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ point, userLocation, onClose }) =
         ) : null}
       </div>
 
-      <div className="px-6 flex-1 overflow-y-auto scrollbar-hide py-2 min-h-0">
-        <p className="text-stone-700 leading-relaxed text-[15px] text-center">{point.description}</p>
+      <div className="info-panel-body px-6 py-2 min-h-0 flex-1 overflow-y-auto scrollbar-hide">
+        <p className="text-stone-700 leading-relaxed text-[15px] text-left">{point.description}</p>
       </div>
 
-      <div className="px-6 pb-6 pt-3 shrink-0">
-        {distance !== null ? (
+      {distance !== null ? (
+        <div className="px-6 pb-4 pt-3 shrink-0">
           <div className="flex items-center justify-center gap-2 py-3 border-t border-stone-100">
             <MapPin size={12} className="text-emerald-600 opacity-60" />
             <span className="text-[11px] font-bold text-stone-400 tracking-wider uppercase">
               Du er <span className="text-emerald-700">{distance} meter</span> væk (fugleflugtslinie)
             </span>
           </div>
-        ) : (
-          <div className="py-2" />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="pb-4 shrink-0" aria-hidden="true" />
+      )}
     </div>
   );
 };

@@ -6,7 +6,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
   requireAuth();
-  $data = readPointsDataOrFail();
+  $data = hydratePointsData(readPointsDataOrFail());
   respond(true, $data);
 }
 

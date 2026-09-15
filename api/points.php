@@ -6,7 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: public, max-age=60');
 
 try {
-  $data = readPointsData(false);
+  $data = hydratePointsData(readPointsData(false));
   echo json_encode([
     'audioPoints' => $data['audioPoints'],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

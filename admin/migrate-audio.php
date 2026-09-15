@@ -71,18 +71,33 @@ function migrateAudio(bool $dryRun = false): array
     $updated = false;
 
     foreach ($pointsData['audioPoints'] as &$point) {
-      $src = (string) ($point['audioSrc'] ?? '');
-      if ($src === '' || $src === 'urne') {
+      $pointId = (int) ($point['id'] ?? 0);
+      if ($pointId <= 0) {
         continue;
       }
 
-      if (preg_match('#/audio/[^/]+/([^/]+\.mp3)$#i', $src, $matches)) {
-        $filename = $matches[1];
-        $newUrl = audioFileUrl($filename);
-        if ($newUrl !== $src) {
-          $report['urlUpdates'][] = $src . ' → ' . $newUrl;
+      $src = (string) ($point['audioSrc'] ?? '');
+      if ($src !== '' && $src !== 'urne') {
+        if (preg_match('#/audio/(?:[^/]+/)?([^/]+\.mp3)(?:\?|$)#i', $src, $matches)) {
+          $filename = $matches[1];
+          $newUrl = audioFileUrl($filename);
+          if ($newUrl !== $src) {
+            $report['urlUpdates'][] = $src . ' → ' . $newUrl;
+            if (!$dryRun) {
+              $point['audioSrc'] = $newUrl;
+              $updated = true;
+            }
+          }
+        }
+      }
+
+      $resolvedFilename = resolvePointAudioFilename($pointId, $point);
+      if ($resolvedFilename !== null) {
+        $resolvedUrl = audioFileUrl($resolvedFilename);
+        if (($point['audioSrc'] ?? '') !== $resolvedUrl) {
+          $report['urlUpdates'][] = 'Punkt #' . $pointId . ' → ' . $resolvedFilename;
           if (!$dryRun) {
-            $point['audioSrc'] = $newUrl;
+            $point['audioSrc'] = $resolvedUrl;
             $updated = true;
           }
         }

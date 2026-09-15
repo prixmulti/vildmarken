@@ -1,5 +1,6 @@
 admin/config.local.php
 data/points.json
+data/analytics/
 .DS_Store
 app/node_modules
 app/.env.local
